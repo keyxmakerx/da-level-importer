@@ -73,7 +73,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       return;
     }
 
-    const backgroundColor = this.element.querySelector("input[name='backgroundColor']")?.value ?? "#000000";
+    const backgroundColor = this.element.querySelector("input[name='backgroundColor']")?.value || "#000000";
     const gridAlpha = parseFloat(this.element.querySelector("input[name='gridAlpha']")?.value ?? "0");
     const copyImages = this.element.querySelector("input[name='copyImages']")?.checked ?? false;
 

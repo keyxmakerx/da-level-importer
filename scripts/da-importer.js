@@ -182,7 +182,7 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
     elevation: { bottom: i * FLOOR_HEIGHT, top: (i + 1) * FLOOR_HEIGHT },
     background: {
       src: f.jpg,
-      color: null,
+      color: backgroundColor,
       tint: "#ffffff",
       alphaThreshold: 0.75
     },
