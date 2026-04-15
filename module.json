@@ -1,0 +1,31 @@
+{
+  "id": "da-level-importer",
+
+  "title": "Dungeon Alchemist Level Importer",
+  "version": "0.0.1",
+  "compatibility": {
+    "minimum": 14,
+    "verified": 14
+  },
+  
+  "authors": [
+    {
+      "name": "Mestre Digital",
+      "flags": {}
+    }
+  ],  
+  
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/module.css"
+  ],
+
+  "url": "https://github.com/brunocalado/da-level-importer",
+  "manifest": "https://raw.githubusercontent.com/brunocalado/da-level-importer/main/module.json",
+  "download": "https://codeload.github.com/brunocalado/da-level-importer/zip/main",
+
+  "description": "Imports multi-floor Dungeon Alchemist exports into a single Foundry VTT v14+ Scene using native Scene Levels. Each floor becomes a Level with its walls, doors, and lights automatically bound."
+  
+}

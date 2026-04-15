@@ -1,0 +1,82 @@
+#da-importer .form-fields {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+#da-importer .form-fields input {
+  flex: 1;
+}
+
+#da-importer .sheet-footer {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border-light-primary);
+}
+
+/* ── Section divider ─────────────────────────────────────────── */
+#da-importer .da-section-divider {
+  border: none;
+  border-top: 1px solid var(--color-border-light-primary);
+  margin: 0.75rem 0;
+}
+
+/* ── Toggle pill ─────────────────────────────────────────────── */
+#da-importer .da-toggle-group .form-fields {
+  flex: 0 0 auto;           /* don't stretch — keep toggle compact */
+}
+
+#da-importer .da-toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Hide the native checkbox visually but keep it accessible */
+#da-importer .da-toggle input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The pill track */
+#da-importer .da-toggle-track {
+  display: inline-flex;
+  align-items: center;
+  width: 2.5rem;          /* 40px */
+  height: 1.375rem;       /* 22px */
+  border-radius: 9999px;
+  background: var(--color-border-light-primary, #888);
+  transition: background 160ms ease;
+  padding: 2px;
+  box-sizing: border-box;
+}
+
+/* The sliding thumb */
+#da-importer .da-toggle-thumb {
+  display: block;
+  width: 1rem;            /* 16px */
+  height: 1rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  transition: transform 160ms ease;
+}
+
+/* ON state — checkbox checked */
+#da-importer .da-toggle input[type="checkbox"]:checked + .da-toggle-track {
+  background: var(--color-level-1, #4a90e2);
+}
+
+#da-importer .da-toggle input[type="checkbox"]:checked + .da-toggle-track .da-toggle-thumb {
+  transform: translateX(1.125rem);   /* 40 - 16 - 4px padding*2 = 18px, ~1.125rem */
+}
+
+/* Focus ring for keyboard accessibility */
+#da-importer .da-toggle input[type="checkbox"]:focus-visible + .da-toggle-track {
+  outline: 2px solid var(--color-focus-outline, #4a90e2);
+  outline-offset: 2px;
+}

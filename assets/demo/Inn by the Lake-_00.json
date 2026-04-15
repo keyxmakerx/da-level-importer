@@ -1,0 +1,68 @@
+{
+  "name": "Inn by the Lake-_00",
+  "width": 3816,
+  "height": 3960,
+  "grid": 72,
+  "shiftX": 0,
+  "shiftY": 0,
+  "gridDistance": 5.0,
+  "gridUnits": "ft",
+  "padding": 0.0,
+  "gridColor": "#000000",
+  "gridAlpha": 0.2,
+  "globalLight": true,
+  "darkness": 0.0,
+  "lights": [],
+  "walls": [
+    {
+      "c": [
+        2019,
+        1572,
+        1871,
+        1572
+      ],
+      "move": 1,
+      "sense": 1,
+      "sound": 1,
+      "door": 0
+    },
+    {
+      "c": [
+        1871,
+        1424,
+        1871,
+        1572
+      ],
+      "move": 1,
+      "sense": 1,
+      "sound": 1,
+      "door": 0
+    },
+    {
+      "c": [
+        2019,
+        1424,
+        1871,
+        1424
+      ],
+      "move": 1,
+      "sense": 1,
+      "sound": 1,
+      "door": 0
+    },
+    {
+      "c": [
+        2019,
+        1424,
+        2019,
+        1572
+      ],
+      "move": 1,
+      "sense": 1,
+      "sound": 1,
+      "door": 0
+    }
+  ],
+  "img": null,
+  "foreground": null
+}
