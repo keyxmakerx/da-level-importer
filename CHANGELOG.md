@@ -1,8 +1,5 @@
-# Changelog
+# 0.0.2
 
-## [Unreleased]
+## [Added]
+- Scenes directory sidebar button "DA Level Importer" injected below the search bar via the `renderSceneDirectory` hook for quick one-click access to `DA.Importer()`.
 
-### Added
-- Scene Defaults section in the importer dialog with two options applied to every import:
-  - **Background Color** — color picker defaulting to `#000000` for the scene background fill.
-  - **Grid Opacity** — range slider (0–1, step 0.05) defaulting to `0.00` (invisible grid), with a live numeric readout.
