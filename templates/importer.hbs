@@ -14,26 +14,30 @@
   <fieldset>
     <legend>Scene Defaults</legend>
 
-    <div class="form-group">
-      <label>Background Color</label>
-      <div class="form-fields">
-        <input type="color" name="backgroundColor" value="#000000" />
+    <div class="da-field-card">
+      <div class="form-group da-inline-group">
+        <label>Background Color</label>
+        <div class="form-fields">
+          <input type="color" name="backgroundColor" value="#000000" />
+        </div>
       </div>
       <p class="hint">Scene background color applied to all levels.</p>
     </div>
 
-    <div class="form-group">
-      <label>Grid Opacity</label>
-      <div class="form-fields">
-        <input type="range" name="gridAlpha" min="0" max="1" step="0.05" value="0" />
-        <span class="range-value">0.00</span>
+    <div class="da-field-card">
+      <div class="form-group da-inline-group">
+        <label>Grid Opacity</label>
+        <div class="form-fields">
+          <input type="range" name="gridAlpha" min="0" max="1" step="0.05" value="0" />
+          <span class="range-value">0.00</span>
+        </div>
       </div>
       <p class="hint">Opacity of the grid overlay (0 = invisible, 1 = fully visible).</p>
     </div>
 
     <hr class="da-section-divider" />
 
-    <div class="form-group da-toggle-group">
+    <div class="form-group da-inline-group da-toggle-group">
       <label for="copyImages">Copy Images to World</label>
       <div class="form-fields">
         <label class="da-toggle">
@@ -43,13 +47,13 @@
           </span>
         </label>
       </div>
-      <p class="hint">
-        When enabled, copies all floor images into
-        <code>worlds/&lt;world&gt;/da-imported/&lt;map-name&gt;/</code>
-        and points the scene to the copies.
-        Files are renamed to kebab-case.
-      </p>
     </div>
+    <p class="hint">
+      When enabled, copies all floor images into
+      <code>worlds/&lt;world&gt;/da-imported/&lt;map-name&gt;/</code>
+      and points the scene to the copies.
+      Files are renamed to kebab-case.
+    </p>
   </fieldset>
 
   <footer class="sheet-footer flexrow">

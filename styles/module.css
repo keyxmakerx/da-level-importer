@@ -4,6 +4,11 @@
   margin: 0px 8px 0;
 }
 
+/* Solid background — prevents the window content from being see-through */
+#da-importer .window-content {
+  background: var(--color-cool-5, #1a1a2e);
+}
+
 #da-importer .form-fields {
   display: flex;
   gap: 0.5rem;
@@ -27,9 +32,64 @@
   margin: 0.75rem 0;
 }
 
+/* ── Inline form-group: label left, control right on same row ── */
+#da-importer .da-inline-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+  gap: 0.75rem;
+}
+
+#da-importer .da-inline-group > label {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+  font-weight: bold;
+}
+
+#da-importer .da-inline-group > .form-fields {
+  flex: 0 0 auto;
+}
+
+/* ── Field card: visual grouping for individual controls ──────── */
+#da-importer .da-field-card {
+  border: 1px solid var(--color-border-light-primary, #555);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+#da-importer .da-field-card .hint {
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+}
+
+/* ── Color picker: square swatch ─────────────────────────────── */
+#da-importer input[type="color"] {
+  padding: 0;
+  border: 1px solid var(--color-border-light-primary, #555);
+  border-radius: 3px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+/* ── Range slider row ────────────────────────────────────────── */
+#da-importer .form-fields input[type="range"] {
+  flex: 1;
+}
+
+#da-importer .range-value {
+  flex: 0 0 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Toggle pill ─────────────────────────────────────────────── */
 #da-importer .da-toggle-group .form-fields {
-  flex: 0 0 auto;           /* don't stretch — keep toggle compact */
+  flex: 0 0 auto;
 }
 
 #da-importer .da-toggle {
@@ -52,8 +112,8 @@
 #da-importer .da-toggle-track {
   display: inline-flex;
   align-items: center;
-  width: 2.5rem;          /* 40px */
-  height: 1.375rem;       /* 22px */
+  width: 2.5rem;
+  height: 1.375rem;
   border-radius: 9999px;
   background: var(--color-border-light-primary, #888);
   transition: background 160ms ease;
@@ -64,7 +124,7 @@
 /* The sliding thumb */
 #da-importer .da-toggle-thumb {
   display: block;
-  width: 1rem;            /* 16px */
+  width: 1rem;
   height: 1rem;
   border-radius: 9999px;
   background: #ffffff;
@@ -78,7 +138,7 @@
 }
 
 #da-importer .da-toggle input[type="checkbox"]:checked + .da-toggle-track .da-toggle-thumb {
-  transform: translateX(1.125rem);   /* 40 - 16 - 4px padding*2 = 18px, ~1.125rem */
+  transform: translateX(1.125rem);
 }
 
 /* Focus ring for keyboard accessibility */
