@@ -1,8 +1,10 @@
 import { DAImporterDialog } from "./importer-dialog.js";
+import { DARegionAdderDialog } from "./region-adder-dialog.js";
 
 Hooks.once("init", () => {
   game.modules.get("da-level-importer").api = {
-    Importer: () => new DAImporterDialog().render(true)
+    Importer: () => new DAImporterDialog().render(true),
+    AddRegion: () => new DARegionAdderDialog().render(true)
   };
 });
 

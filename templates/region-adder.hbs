@@ -1,0 +1,59 @@
+<div>
+  {{#unless hasScene}}
+    <p class="da-region-empty">No active scene. Open a scene that has Levels and try again.</p>
+  {{else}}
+
+    <div class="da-field-card">
+      <p class="da-region-info">
+        <strong>Scene:</strong> {{sceneName}}<br/>
+        <strong>Total Levels:</strong> {{levelCount}}
+      </p>
+    </div>
+
+    <div class="da-field-card">
+      <div class="form-group da-inline-group">
+        <label>Starting Level</label>
+        <div class="form-fields">
+          <select name="startingLevelId">
+            {{#each levels}}
+              <option value="{{_id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+          </select>
+        </div>
+      </div>
+      <p class="hint">The level the user is currently on (the staircase origin).</p>
+    </div>
+
+    <div class="da-field-card">
+      <div class="form-group da-inline-group">
+        <label>Levels Up</label>
+        <div class="form-fields">
+          <input type="number" name="upCount" min="0" max="{{maxUp}}" value="0" />
+        </div>
+      </div>
+      <p class="hint">How many levels above the starting level the region must also appear on.</p>
+    </div>
+
+    <div class="da-field-card">
+      <div class="form-group da-inline-group">
+        <label>Levels Down</label>
+        <div class="form-fields">
+          <input type="number" name="downCount" min="0" max="{{maxDown}}" value="0" />
+        </div>
+      </div>
+      <p class="hint">How many levels below the starting level the region must also appear on.</p>
+    </div>
+
+    <div class="da-field-card">
+      <p><strong>Region will appear on:</strong></p>
+      <ul class="da-region-target-list"></ul>
+    </div>
+
+    <footer class="sheet-footer flexrow">
+      <button type="button" data-action="pickLocation">
+        <i class="fas fa-crosshairs"></i> Pick Location on Canvas
+      </button>
+    </footer>
+
+  {{/unless}}
+</div>

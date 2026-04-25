@@ -29,6 +29,12 @@ DA.Importer();
 
 This opens a dialog where you select the folder exported by Dungeon Alchemist. The folder should contain the level images and the exported JSON file.
 
+This will add a region over multiple levels to allow players to change level.
+
+```js
+DA.AddRegion()
+```
+
 # 📦 Installation
 
 Install via the Foundry VTT Module browser or use this manifest link:
