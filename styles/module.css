@@ -25,6 +25,84 @@
   border-top: 1px solid var(--color-border-light-primary);
 }
 
+/* ── Tab navigation ──────────────────────────────────────────── */
+#da-importer .da-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border-light-primary);
+  margin-bottom: 0.75rem;
+  gap: 0;
+}
+
+#da-importer .da-tab-btn {
+  flex: 1;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  padding: 0.4rem 0.75rem;
+  color: var(--color-text-light-6, #888);
+  font-size: var(--font-size-13, 13px);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+#da-importer .da-tab-btn:hover {
+  color: var(--color-text-light-primary, #ccc);
+}
+
+#da-importer .da-tab-btn--active {
+  color: var(--color-text-light-primary, #eee);
+  border-bottom-color: var(--color-level-1, #4a90e2);
+  font-weight: bold;
+}
+
+/* ── Tab panels ──────────────────────────────────────────────── */
+#da-importer .da-tab-panel--hidden {
+  display: none;
+}
+
+/* ── Door row: select + preview/button side by side ──────────── */
+#da-importer .da-door-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: 1;
+}
+
+#da-importer .da-door-row select {
+  flex: 1;
+}
+
+#da-importer .da-door-preview {
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 3rem;
+  object-fit: contain;
+  border: 1px solid var(--color-border-light-primary, #555);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: zoom-in;
+}
+
+/* ── Door texture hover tooltip ──────────────────────────────── */
+.da-door-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 9999;
+  padding: 4px;
+  background: var(--color-cool-5, #1a1a2e);
+  border: 1px solid var(--color-border-light-primary, #555);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.da-door-tooltip img {
+  display: block;
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+}
+
 /* ── Section divider ─────────────────────────────────────────── */
 #da-importer .da-section-divider {
   border: none;

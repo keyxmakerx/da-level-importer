@@ -106,7 +106,7 @@ async function _copyImage(srcUrl, destFolder, kebabStem, ext) {
  * @param {number} [params.gridAlpha=0]     Grid overlay opacity (0–1).
  * @returns {Promise<Scene|null>}           The created Scene, or null on abort.
  */
-export async function importFolder({ source, path, backgroundColor = "#000000", gridAlpha = 0, copyImages = false }) {
+export async function importFolder({ source, path, backgroundColor = "#000000", gridAlpha = 0, copyImages = false, doorTexture = "", doorSound = "" }) {
   const FilePicker = foundry.applications.apps.FilePicker.implementation;
 
   let listing;
@@ -203,7 +203,7 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
   floors.forEach((f, i) => {
     const levelId = levels[i]._id;
     const bottom = i * FLOOR_HEIGHT;
-    for (const w of (f.data.walls ?? [])) walls.push(_mapWall(w, levelId));
+    for (const w of (f.data.walls ?? [])) walls.push(_mapWall(w, levelId, doorTexture, doorSound));
     for (const l of (f.data.lights ?? [])) lights.push(_mapLight(l, levelId, bottom));
   });
   console.log(`[DA Importer] built ${levels.length} levels, ${walls.length} walls, ${lights.length} lights`);
@@ -333,13 +333,17 @@ function _wallEnum(v) {
 /**
  * Map a DA wall into a v14 WallDocument source. Level binding uses the
  * `levels` Set field (SceneLevelsSetField) that accepts an array of Level ids.
+ * When the wall is a standard door (door=1) and the user configured a texture
+ * or sound in the dialog, those are stamped onto the document here.
  *
  * @param {object} daWall
  * @param {string} levelId
+ * @param {string} [doorTexture=""]  Path to a door texture webp; empty string = skip.
+ * @param {string} [doorSound=""]   Foundry door sound key; empty string = skip.
  * @returns {object}
  */
-function _mapWall(daWall, levelId) {
-  return {
+function _mapWall(daWall, levelId, doorTexture = "", doorSound = "") {
+  const wallDoc = {
     c: daWall.c,
     move:  _wallEnum(daWall.move ?? 1),
     sight: _wallEnum(daWall.sense ?? 1),
@@ -348,6 +352,11 @@ function _mapWall(daWall, levelId) {
     ds: 0,
     levels: [levelId]
   };
+  if (daWall.door === 1) {
+    if (doorTexture) wallDoc.animation = { texture: doorTexture, type: "swing" };
+    if (doorSound)   wallDoc.doorSound  = doorSound;
+  }
+  return wallDoc;
 }
 
 /**
