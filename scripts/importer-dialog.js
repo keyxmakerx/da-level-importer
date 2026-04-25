@@ -154,11 +154,12 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const backgroundColor = this.element.querySelector("input[name='backgroundColor']")?.value || "#000000";
     const gridAlpha = parseFloat(this.element.querySelector("input[name='gridAlpha']")?.value ?? "0");
+    const lastLevelIsRoof = this.element.querySelector("input[name='lastLevelIsRoof']")?.checked ?? false;
     const copyImages = this.element.querySelector("input[name='copyImages']")?.checked ?? false;
     const doorTexture = this.element.querySelector("select[name='doorTexture']")?.value || "";
     const doorSound   = this.element.querySelector("select[name='doorSound']")?.value   || "";
 
-    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, copyImages, doorTexture, doorSound });
+    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, lastLevelIsRoof, copyImages, doorTexture, doorSound });
     if (scene) this.close();
   }
 }

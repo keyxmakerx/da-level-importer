@@ -6,6 +6,8 @@
 
 
 ## [Added]
+- "Last Level is Roof" toggle (off by default): when enabled, the last imported level's `visibility.levels` is set to the id of the level directly below it, causing it to render only when that floor is active.
+
 - Scenes directory sidebar button "DA Level Importer" injected below the search bar via the `renderSceneDirectory` hook for quick one-click access to `DA.Importer()`.
 - Tabbed importer dialog: "Scene Defaults" and "Doors" tabs for organized settings.
 - Door texture selector with 25 Foundry canvas door options; includes real-time preview with hover tooltip showing enlarged image.
