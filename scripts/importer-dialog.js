@@ -317,14 +317,21 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.name = `levelVisibility[${i}][${j}]`;
+        cb.dataset.levelIndex = String(j);
         this._visCheckboxes.set(`${i},${j}`, cb);
         optLabel.append(cb, ` ${rowData[j].nameInput.value || `Floor ${j}`}`);
         dropdown.appendChild(optLabel);
       }
 
+      // Render the button label as the comma-separated list of selected level
+      // indices (the field number, not its name) so multi-selection stays legible.
       const updateBtn = () => {
-        const n = dropdown.querySelectorAll("input:checked").length;
-        btn.textContent = n === 0 ? "— ▾" : `${n} ▾`;
+        const indices = [...dropdown.querySelectorAll("input:checked")]
+          .map(cb => cb.dataset.levelIndex);
+        const list = indices.join(", ");
+        btn.textContent = indices.length === 0 ? "— ▾" : `${list} ▾`;
+        // Full list as a tooltip so it stays accessible even when wrapped/clipped.
+        btn.title = indices.length === 0 ? "" : list;
       };
       updateBtn();
       dropdown.addEventListener("change", updateBtn);
