@@ -378,3 +378,12 @@ body.da-region-picking,
 body.da-region-picking canvas {
   cursor: crosshair !important;
 }
+
+/* ── Remove Foundry's default orange focus border on buttons ─── */
+#da-importer a.button:focus,
+#da-importer button:focus,
+#da-region-adder a.button:focus,
+#da-region-adder button:focus {
+  outline: none;
+  box-shadow: none;
+}

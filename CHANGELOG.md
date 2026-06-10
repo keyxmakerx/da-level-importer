@@ -6,6 +6,9 @@
 - `scripts/constants.js` with `MODULE_ID` and `FLOOR_HEIGHT` as shared module-wide constants.
 - Per-level **Is Roof** toggle in the Levels tab: any level (except the first) can be flagged as a roof. The toggle carries a tooltip with the behavior description. Replaces the former global "Last Level is Roof" toggle.
 
+## [Fixed]
+- Removed Foundry's default orange focus outline and glow from buttons inside the importer and region-adder dialogs; buttons elsewhere in the VTT are unaffected.
+
 ## [Removed]
 - Global "Last Level is Roof" toggle from the Scene Defaults tab; superseded by the per-level roof toggle in the Levels tab.
 
