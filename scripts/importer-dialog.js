@@ -206,7 +206,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     // Header row
     const header = document.createElement("div");
     header.className = "da-levels-header";
-    for (const label of ["", "Name", "Bottom", "Top", "Roof", "Visible"]) {
+    for (const label of ["#", "", "Name", "Bottom", "Top", "Roof", "Visible"]) {
       const span = document.createElement("span");
       span.textContent = label;
       header.appendChild(span);
@@ -222,6 +222,10 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
       const row = document.createElement("div");
       row.className = "da-level-row";
+
+      const indexBadge = document.createElement("span");
+      indexBadge.className = "da-level-index";
+      indexBadge.textContent = String(i);
 
       const thumb = document.createElement("img");
       thumb.className = "da-level-thumb";
@@ -282,7 +286,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       roofTrack.appendChild(roofThumb);
       roofLabel.append(roofCheckbox, roofTrack);
 
-      row.append(thumb, nameInput, bottomInput, topInput, roofLabel);
+      row.append(indexBadge, thumb, nameInput, bottomInput, topInput, roofLabel);
       list.appendChild(row);
       rowData.push({ row, nameInput, index: i });
     }

@@ -240,7 +240,7 @@
 #da-importer .da-levels-header,
 #da-importer .da-level-row {
   display: grid;
-  grid-template-columns: 2.5rem 1fr 4rem 4rem 2.5rem 3.5rem;
+  grid-template-columns: 1.5rem 2.5rem 1fr 4rem 4rem 2.5rem 3.5rem;
   gap: 0.4rem;
   align-items: center;
 }
@@ -323,6 +323,13 @@
 
 #da-importer .da-level-row:nth-child(even) {
   background: rgba(255, 255, 255, 0.04);
+}
+
+#da-importer .da-level-index {
+  font-size: var(--font-size-11, 11px);
+  color: var(--color-text-light-primary, #fff);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 #da-importer .da-level-thumb {
