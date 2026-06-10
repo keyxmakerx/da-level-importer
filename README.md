@@ -10,6 +10,8 @@ Foundry VTT v14 module that imports a Dungeon Alchemist multi-level export and c
 
 Dungeon Alchemist exports multi-floor maps as sibling file pairs — one `.jpg` image and one `.json` data file per floor, named with a numeric suffix (e.g. `TavernMap-_0.jpg`, `TavernMap-_0.json`, `TavernMap-_1.jpg`, `TavernMap-_1.json`).
 
+<p align="center"><img width="900" src="docs/importer-preview.webp"></p>
+
 This module reads all pairs in a folder, parses each JSON for wall, door, and light data, and creates a **single Foundry VTT Scene** where each floor becomes a native **Scene Level** (a feature introduced in Foundry VTT v14). Walls, doors, and lights are bound to their respective level so they only activate when that floor is active — no manual setup required.
 
 ## Requirements

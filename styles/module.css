@@ -331,6 +331,27 @@
   object-fit: cover;
   border-radius: 3px;
   border: 1px solid var(--color-border-light-primary, #555);
+  cursor: zoom-in;
+}
+
+/* ── Level thumb hover tooltip ───────────────────────────────── */
+.da-level-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 9999;
+  padding: 4px;
+  background: var(--color-cool-5, #1a1a2e);
+  border: 1px solid var(--color-border-light-primary, #555);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.da-level-tooltip img {
+  display: block;
+  width: 320px;
+  height: 320px;
+  object-fit: contain;
 }
 
 #da-importer .da-level-row input[type="number"] {

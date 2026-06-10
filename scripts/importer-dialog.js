@@ -228,6 +228,24 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       thumb.src = pair.jpg;
       thumb.alt = "";
 
+      // Hover tooltip — shows an enlarged version of the level image
+      let levelTooltip = null;
+      thumb.addEventListener("mouseenter", () => {
+        levelTooltip = document.createElement("div");
+        levelTooltip.className = "da-level-tooltip";
+        const tooltipImg = document.createElement("img");
+        tooltipImg.src = pair.jpg;
+        levelTooltip.appendChild(tooltipImg);
+        document.body.appendChild(levelTooltip);
+        const rect = thumb.getBoundingClientRect();
+        levelTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        levelTooltip.style.top  = `${rect.top - 8}px`;
+      });
+      thumb.addEventListener("mouseleave", () => {
+        levelTooltip?.remove();
+        levelTooltip = null;
+      });
+
       const nameInput = document.createElement("input");
       nameInput.type = "text";
       nameInput.name = `levelName[${i}]`;
@@ -345,6 +363,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   async _onClose(options) {
     this._teardownVisDropdowns();
     document.querySelector(".da-door-tooltip")?.remove();
+    document.querySelector(".da-level-tooltip")?.remove();
     return super._onClose(options);
   }
 
