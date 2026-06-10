@@ -101,13 +101,15 @@ async function _copyImage(srcUrl, destFolder, kebabStem, ext) {
  * Import a Dungeon Alchemist folder as a single v14 Scene with Levels.
  *
  * @param {object} params
- * @param {string} params.source            FilePicker source (e.g. "data", "public").
- * @param {string} params.path              Folder path inside that source.
- * @param {string} [params.backgroundColor="#000000"]  Scene background fill color.
- * @param {number} [params.gridAlpha=0]     Grid overlay opacity (0–1).
- * @returns {Promise<Scene|null>}           The created Scene, or null on abort.
+ * @param {string} params.source                         FilePicker source (e.g. "data", "public").
+ * @param {string} params.path                           Folder path inside that source.
+ * @param {string} [params.backgroundColor="#000000"]   Scene background fill color.
+ * @param {number} [params.gridAlpha=0]                 Grid overlay opacity (0–1).
+ * @param {Array<{name?:string,bottom?:number,top?:number,isRoof?:boolean}>} [params.levelOverrides]
+ *   Per-floor overrides for name, elevation, and roof behavior.
+ * @returns {Promise<Scene|null>}                        The created Scene, or null on abort.
  */
-export async function importFolder({ source, path, backgroundColor = "#000000", gridAlpha = 0, copyImages = false, lastLevelIsRoof = false, doorTexture = "", doorSound = "", levelOverrides = [] }) {
+export async function importFolder({ source, path, backgroundColor = "#000000", gridAlpha = 0, copyImages = false, doorTexture = "", doorSound = "", levelOverrides = [] }) {
   const FilePicker = foundry.applications.apps.FilePicker.implementation;
 
   let listing;
@@ -207,11 +209,12 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
     };
   });
 
-  // When the last level is a roof it should only be visible when the floor below
-  // it is active — achieved by setting its visibility.levels to the previous level's id.
-  if (lastLevelIsRoof && levels.length > 1) {
-    levels[levels.length - 1].visibility.levels = [levels[levels.length - 2]._id];
-  }
+  // Any level flagged as a roof only renders when the level directly below it is active.
+  levels.forEach((level, i) => {
+    if (i > 0 && levelOverrides[i]?.isRoof) {
+      level.visibility.levels = [levels[i - 1]._id];
+    }
+  });
 
   const walls = [];
   const lights = [];

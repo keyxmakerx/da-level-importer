@@ -4,6 +4,10 @@
 - **Levels tab** in the importer dialog: after selecting a folder, a new "Levels" tab is populated with one row per detected floor — thumbnail, editable name, and editable bottom/top elevation inputs.
 - **Uniform floor height** field at the top of the Levels tab: changing this value recalculates all individual bottom/top inputs automatically, making it easy to set the same height for every level.
 - `scripts/constants.js` with `MODULE_ID` and `FLOOR_HEIGHT` as shared module-wide constants.
+- Per-level **Is Roof** toggle in the Levels tab: any level (except the first) can be flagged as a roof. The toggle carries a tooltip with the behavior description. Replaces the former global "Last Level is Roof" toggle.
+
+## [Removed]
+- Global "Last Level is Roof" toggle from the Scene Defaults tab; superseded by the per-level roof toggle in the Levels tab.
 
 # 0.0.2
 

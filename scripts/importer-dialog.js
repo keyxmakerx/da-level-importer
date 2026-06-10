@@ -185,7 +185,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     // Header row
     const header = document.createElement("div");
     header.className = "da-levels-header";
-    for (const label of ["", "Name", "Bottom", "Top"]) {
+    for (const label of ["", "Name", "Bottom", "Top", "Roof"]) {
       const span = document.createElement("span");
       span.textContent = label;
       header.appendChild(span);
@@ -225,7 +225,23 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       topInput.min = "0";
       topInput.step = "1";
 
-      row.append(thumb, nameInput, bottomInput, topInput);
+      // Roof toggle — disabled for the first floor (no level below it to bind to)
+      const roofLabel = document.createElement("label");
+      roofLabel.className = "da-toggle";
+      roofLabel.title = "When enabled, this level only renders when the level directly below it is active (roof behavior).";
+
+      const roofCheckbox = document.createElement("input");
+      roofCheckbox.type = "checkbox";
+      roofCheckbox.name = `levelIsRoof[${i}]`;
+
+      const roofTrack = document.createElement("span");
+      roofTrack.className = "da-toggle-track";
+      const roofThumb = document.createElement("span");
+      roofThumb.className = "da-toggle-thumb";
+      roofTrack.appendChild(roofThumb);
+      roofLabel.append(roofCheckbox, roofTrack);
+
+      row.append(thumb, nameInput, bottomInput, topInput, roofLabel);
       list.appendChild(row);
     }
   }
@@ -252,7 +268,6 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const backgroundColor = this.element.querySelector("input[name='backgroundColor']")?.value || "#000000";
     const gridAlpha = parseFloat(this.element.querySelector("input[name='gridAlpha']")?.value ?? "0");
-    const lastLevelIsRoof = this.element.querySelector("input[name='lastLevelIsRoof']")?.checked ?? false;
     const copyImages = this.element.querySelector("input[name='copyImages']")?.checked ?? false;
     const doorTexture = this.element.querySelector("select[name='doorTexture']")?.value || "";
     const doorSound   = this.element.querySelector("select[name='doorSound']")?.value   || "";
@@ -260,10 +275,11 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const levelOverrides = this._floorPairs.map((_, i) => ({
       name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value?.trim() || `Floor ${i}`,
       bottom: parseInt(this.element.querySelector(`input[name="levelBottom[${i}]"]`)?.value ?? "", 10),
-      top:    parseInt(this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "", 10)
+      top:    parseInt(this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "", 10),
+      isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false
     }));
 
-    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, lastLevelIsRoof, copyImages, doorTexture, doorSound, levelOverrides });
+    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, copyImages, doorTexture, doorSound, levelOverrides });
     if (scene) this.close();
   }
 }
