@@ -1,8 +1,11 @@
-import { importFolder } from "./da-importer.js";
+import { importFolder, collectFloorPairs } from "./da-importer.js";
+import { FLOOR_HEIGHT } from "./constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) {
+  /** @type {{stem:string, index:number, json:string, jpg:string}[]} */
+  _floorPairs = [];
   static DEFAULT_OPTIONS = {
     id: "da-importer",
     tag: "form",
@@ -35,11 +38,21 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const picker = new FilePicker({
       type: "folder",
       current: "",
-      callback: (path) => {
+      callback: async (path) => {
         const folderInput = this.element.querySelector("input[name='folder']");
         const sourceInput = this.element.querySelector("input[name='source']");
         if (folderInput) folderInput.value = path;
-        if (sourceInput) sourceInput.value = picker.activeSource ?? "data";
+        const source = picker.activeSource ?? "data";
+        if (sourceInput) sourceInput.value = source;
+
+        // Browse the folder so the Levels tab can show per-level rows.
+        try {
+          const listing = await FilePicker.browse(source, path);
+          this._floorPairs = collectFloorPairs(listing.files);
+        } catch (_err) {
+          this._floorPairs = [];
+        }
+        this._populateLevelsTab();
       }
     });
     await picker.browse("");
@@ -130,6 +143,91 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         tooltip = null;
       });
     }
+
+    // Uniform floor-height field — when changed, recalculates all per-level inputs.
+    const uniformInput = this.element.querySelector("input[name='uniformFloorHeight']");
+    if (uniformInput) {
+      uniformInput.addEventListener("change", () => {
+        const h = parseInt(uniformInput.value, 10);
+        if (!Number.isFinite(h) || h < 1) return;
+        this._floorPairs.forEach((_, i) => {
+          const bInput = this.element.querySelector(`input[name="levelBottom[${i}]"]`);
+          const tInput = this.element.querySelector(`input[name="levelTop[${i}]"]`);
+          if (bInput) bInput.value = String(i === 0 ? 0 : i * h + 1);
+          if (tInput) tInput.value = String((i + 1) * h);
+        });
+      });
+    }
+
+    // Restore levels tab rows after any re-render.
+    this._populateLevelsTab();
+  }
+
+  /**
+   * Rebuild the Levels tab rows from this._floorPairs.
+   * Called after folder selection and after each render.
+   * Shows a placeholder when no folder has been selected yet.
+   */
+  _populateLevelsTab() {
+    const placeholder = this.element?.querySelector(".da-levels-placeholder");
+    const list = this.element?.querySelector(".da-levels-list");
+    if (!list) return;
+
+    if (!this._floorPairs.length) {
+      if (placeholder) placeholder.hidden = false;
+      list.innerHTML = "";
+      return;
+    }
+
+    if (placeholder) placeholder.hidden = true;
+    list.innerHTML = "";
+
+    // Header row
+    const header = document.createElement("div");
+    header.className = "da-levels-header";
+    for (const label of ["", "Name", "Bottom", "Top"]) {
+      const span = document.createElement("span");
+      span.textContent = label;
+      header.appendChild(span);
+    }
+    list.appendChild(header);
+
+    for (let i = 0; i < this._floorPairs.length; i++) {
+      const pair = this._floorPairs[i];
+      const defaultBottom = i === 0 ? 0 : i * FLOOR_HEIGHT + 1;
+      const defaultTop = (i + 1) * FLOOR_HEIGHT;
+
+      const row = document.createElement("div");
+      row.className = "da-level-row";
+
+      const thumb = document.createElement("img");
+      thumb.className = "da-level-thumb";
+      thumb.src = pair.jpg;
+      thumb.alt = "";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.name = `levelName[${i}]`;
+      nameInput.value = `Floor ${i}`;
+      nameInput.placeholder = "Level name";
+
+      const bottomInput = document.createElement("input");
+      bottomInput.type = "number";
+      bottomInput.name = `levelBottom[${i}]`;
+      bottomInput.value = String(defaultBottom);
+      bottomInput.min = "0";
+      bottomInput.step = "1";
+
+      const topInput = document.createElement("input");
+      topInput.type = "number";
+      topInput.name = `levelTop[${i}]`;
+      topInput.value = String(defaultTop);
+      topInput.min = "0";
+      topInput.step = "1";
+
+      row.append(thumb, nameInput, bottomInput, topInput);
+      list.appendChild(row);
+    }
   }
 
   /**
@@ -159,7 +257,13 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const doorTexture = this.element.querySelector("select[name='doorTexture']")?.value || "";
     const doorSound   = this.element.querySelector("select[name='doorSound']")?.value   || "";
 
-    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, lastLevelIsRoof, copyImages, doorTexture, doorSound });
+    const levelOverrides = this._floorPairs.map((_, i) => ({
+      name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value?.trim() || `Floor ${i}`,
+      bottom: parseInt(this.element.querySelector(`input[name="levelBottom[${i}]"]`)?.value ?? "", 10),
+      top:    parseInt(this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "", 10)
+    }));
+
+    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, lastLevelIsRoof, copyImages, doorTexture, doorSound, levelOverrides });
     if (scene) this.close();
   }
 }

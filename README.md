@@ -4,6 +4,8 @@ Foundry VTT v14 module that imports a Dungeon Alchemist multi-level export and c
 
 <p align="center"><img width="900" src="docs/preview.webp"></p>
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Donate-red?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/mestredigital)
+
 # How it Works
 
 Dungeon Alchemist exports multi-floor maps as sibling file pairs — one `.jpg` image and one `.json` data file per floor, named with a numeric suffix (e.g. `TavernMap-_0.jpg`, `TavernMap-_0.json`, `TavernMap-_1.jpg`, `TavernMap-_1.json`).

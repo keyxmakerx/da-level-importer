@@ -1,15 +1,16 @@
 import { DAImporterDialog } from "./importer-dialog.js";
 import { DARegionAdderDialog } from "./region-adder-dialog.js";
+import { MODULE_ID } from "./constants.js";
 
 Hooks.once("init", () => {
-  game.modules.get("da-level-importer").api = {
+  game.modules.get(MODULE_ID).api = {
     Importer: () => new DAImporterDialog().render(true),
     AddRegion: () => new DARegionAdderDialog().render(true)
   };
 });
 
 Hooks.once("ready", () => {
-  window.DA = game.modules.get("da-level-importer").api;
+  window.DA = game.modules.get(MODULE_ID).api;
 });
 
 /**
@@ -29,7 +30,7 @@ Hooks.on("renderSceneDirectory", (_app, html) => {
   btn.type = "button";
   btn.className = "da-importer-sidebar-btn";
   btn.innerHTML = '<i class="fas fa-file-import"></i> DA Level Importer';
-  btn.addEventListener("click", () => game.modules.get("da-level-importer").api.Importer());
+  btn.addEventListener("click", () => game.modules.get(MODULE_ID).api.Importer());
 
   // Insert after the native action buttons (Create Scene / Create Folder) so the button
   // sits between those and the search bar, regardless of the search element's tag/class in v14.

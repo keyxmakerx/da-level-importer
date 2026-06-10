@@ -14,6 +14,7 @@
   <nav class="da-tabs" role="tablist">
     <button type="button" class="da-tab-btn da-tab-btn--active" data-tab="scene" role="tab" aria-selected="true">Scene Defaults</button>
     <button type="button" class="da-tab-btn" data-tab="doors" role="tab" aria-selected="false">Doors</button>
+    <button type="button" class="da-tab-btn" data-tab="levels" role="tab" aria-selected="false">Levels</button>
   </nav>
 
   <div class="da-tab-panel" data-tab="scene" role="tabpanel">
@@ -157,6 +158,23 @@
       </div>
       <p class="hint">Sound played when opening or closing imported doors. Select "None" to use the Foundry default.</p>
     </div>
+
+  </div>
+
+  <div class="da-tab-panel da-tab-panel--hidden" data-tab="levels" role="tabpanel">
+
+    <div class="da-field-card">
+      <div class="form-group da-inline-group">
+        <label>Floor Height</label>
+        <div class="form-fields">
+          <input type="number" name="uniformFloorHeight" min="1" step="1" value="10" />
+        </div>
+      </div>
+      <p class="hint">Applies uniform height to all levels. To use different heights per level, edit each row in the table below.</p>
+    </div>
+
+    <p class="hint da-levels-placeholder">Select a folder above to see level rows.</p>
+    <div class="da-levels-list"></div>
 
   </div>
 

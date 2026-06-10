@@ -14,8 +14,9 @@
  * matching Scene Level we build below.
  */
 
+import { FLOOR_HEIGHT } from "./constants.js";
+
 const FLOOR_RE = /-_(\d+)$/;
-const FLOOR_HEIGHT = 10;
 
 /**
  * Convert an arbitrary filename stem to strict kebab-case.
@@ -106,7 +107,7 @@ async function _copyImage(srcUrl, destFolder, kebabStem, ext) {
  * @param {number} [params.gridAlpha=0]     Grid overlay opacity (0–1).
  * @returns {Promise<Scene|null>}           The created Scene, or null on abort.
  */
-export async function importFolder({ source, path, backgroundColor = "#000000", gridAlpha = 0, copyImages = false, lastLevelIsRoof = false, doorTexture = "", doorSound = "" }) {
+export async function importFolder({ source, path, backgroundColor = "#000000", gridAlpha = 0, copyImages = false, lastLevelIsRoof = false, doorTexture = "", doorSound = "", levelOverrides = [] }) {
   const FilePicker = foundry.applications.apps.FilePicker.implementation;
 
   let listing;
@@ -117,7 +118,7 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
     return null;
   }
 
-  const pairs = _collectFloorPairs(listing.files);
+  const pairs = collectFloorPairs(listing.files);
   console.log(`[DA Importer] found ${pairs.length} floor pair(s):`, pairs.map((p) => p.stem));
   if (pairs.length === 0) {
     ui.notifications.warn("DA Importer: no Dungeon Alchemist floor pairs (.jpg + .json) found in folder.");
@@ -176,27 +177,35 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
   const first = floors[0].data;
   const stem = _commonStem(pairs);
 
-  const levels = floors.map((f, i) => ({
-    _id: foundry.utils.randomID(),
-    name: `Floor ${i}`,
-    elevation: { bottom: i === 0 ? 0 : i * FLOOR_HEIGHT + 1, top: (i + 1) * FLOOR_HEIGHT },
-    background: {
-      src: f.jpg,
-      color: backgroundColor,
-      tint: "#ffffff",
-      alphaThreshold: 0.75
-    },
-    foreground: { src: null, tint: "#ffffff", alphaThreshold: 0.75 },
-    fog: { src: null, tint: "#ffffff" },
-    textures: {
-      anchorX: 0.5, anchorY: 0.5,
-      offsetX: 0, offsetY: 0,
-      fit: "fill", scaleX: 1, scaleY: 1, rotation: 0
-    },
-    visibility: { levels: [] },
-    sort: i,
-    flags: {}
-  }));
+  const levels = floors.map((f, i) => {
+    const ov = levelOverrides[i];
+    const name = ov?.name?.trim() || `Floor ${i}`;
+    const defaultBottom = i === 0 ? 0 : i * FLOOR_HEIGHT + 1;
+    const defaultTop = (i + 1) * FLOOR_HEIGHT;
+    const bottom = Number.isFinite(ov?.bottom) ? ov.bottom : defaultBottom;
+    const top    = Number.isFinite(ov?.top)    ? ov.top    : defaultTop;
+    return {
+      _id: foundry.utils.randomID(),
+      name,
+      elevation: { bottom, top },
+      background: {
+        src: f.jpg,
+        color: backgroundColor,
+        tint: "#ffffff",
+        alphaThreshold: 0.75
+      },
+      foreground: { src: null, tint: "#ffffff", alphaThreshold: 0.75 },
+      fog: { src: null, tint: "#ffffff" },
+      textures: {
+        anchorX: 0.5, anchorY: 0.5,
+        offsetX: 0, offsetY: 0,
+        fit: "fill", scaleX: 1, scaleY: 1, rotation: 0
+      },
+      visibility: { levels: [] },
+      sort: i,
+      flags: {}
+    };
+  });
 
   // When the last level is a roof it should only be visible when the floor below
   // it is active — achieved by setting its visibility.levels to the previous level's id.
@@ -276,11 +285,12 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
 
 /**
  * Pair `.json` files with sibling image files and sort by the `-_NN` suffix.
+ * Exported so the importer dialog can inspect the pairs before the full import.
  *
  * @param {string[]} files  Full URLs returned by FilePicker.browse().
  * @returns {{stem:string, index:number, json:string, jpg:string}[]}
  */
-function _collectFloorPairs(files) {
+export function collectFloorPairs(files) {
   const byStem = new Map();
   for (const f of files) {
     const base = decodeURIComponent(f.split("/").pop());

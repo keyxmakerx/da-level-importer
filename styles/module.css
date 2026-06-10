@@ -225,6 +225,67 @@
   outline-offset: 2px;
 }
 
+/* ── Levels tab ──────────────────────────────────────────────── */
+#da-importer .da-levels-placeholder {
+  margin: 0.25rem 0;
+  color: var(--color-text-light-6, #aaa);
+  font-style: italic;
+}
+
+#da-importer .da-levels-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+#da-importer .da-levels-header,
+#da-importer .da-level-row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 4.5rem 4.5rem;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+#da-importer .da-levels-header {
+  font-size: var(--font-size-11, 11px);
+  font-weight: bold;
+  color: var(--color-text-light-6, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0.25rem 0.3rem;
+  border-bottom: 1px solid var(--color-border-light-primary, #555);
+  margin-bottom: 0.25rem;
+}
+
+#da-importer .da-level-row {
+  padding: 0.2rem 0.25rem;
+  border-radius: 3px;
+}
+
+#da-importer .da-level-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#da-importer .da-level-thumb {
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--color-border-light-primary, #555);
+}
+
+#da-importer .da-level-row input[type="number"] {
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Uniform floor height field — constrain the number input width */
+#da-importer input[name="uniformFloorHeight"] {
+  width: 5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Region Adder dialog ─────────────────────────────────────── */
 #da-region-adder .window-content {
   background: var(--color-cool-5, #1a1a2e);
