@@ -6,6 +6,10 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {{stem:string, index:number, json:string, jpg:string}[]} */
   _floorPairs = [];
+  /** Body-level dropdown elements that must be removed when the list is rebuilt or the dialog closes. */
+  _visDropdowns = [];
+  /** @type {Map<string, HTMLInputElement>} Keyed by "levelIndex,otherIndex" for fast lookup at import time. */
+  _visCheckboxes = new Map();
   static DEFAULT_OPTIONS = {
     id: "da-importer",
     tag: "form",
@@ -17,7 +21,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       resizable: false
     },
     position: {
-      width: 480,
+      width: 620,
       height: "auto"
     },
     actions: {
@@ -164,11 +168,28 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
+   * Remove all dropdown elements previously appended to document.body and clear checkbox refs.
+   * Called before rebuilding the list and on dialog close.
+   */
+  _teardownVisDropdowns() {
+    for (const d of this._visDropdowns) d.remove();
+    this._visDropdowns = [];
+    this._visCheckboxes.clear();
+  }
+
+  /**
    * Rebuild the Levels tab rows from this._floorPairs.
    * Called after folder selection and after each render.
    * Shows a placeholder when no folder has been selected yet.
+   *
+   * A second pass wires up each row's Visible Levels dropdown after all rows
+   * exist, so each dropdown can list every other level by name.
+   * Dropdowns are appended to document.body to avoid Foundry's window CSS transform
+   * containing position:fixed elements at the wrong viewport coordinates.
    */
   _populateLevelsTab() {
+    this._teardownVisDropdowns();
+
     const placeholder = this.element?.querySelector(".da-levels-placeholder");
     const list = this.element?.querySelector(".da-levels-list");
     if (!list) return;
@@ -185,13 +206,15 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     // Header row
     const header = document.createElement("div");
     header.className = "da-levels-header";
-    for (const label of ["", "Name", "Bottom", "Top", "Roof"]) {
+    for (const label of ["", "Name", "Bottom", "Top", "Roof", "Visible"]) {
       const span = document.createElement("span");
       span.textContent = label;
       header.appendChild(span);
     }
     list.appendChild(header);
 
+    // First pass — build every row; capture nameInputs for the dropdown labels below.
+    const rowData = [];
     for (let i = 0; i < this._floorPairs.length; i++) {
       const pair = this._floorPairs[i];
       const defaultBottom = i === 0 ? 0 : i * FLOOR_HEIGHT + 1;
@@ -225,7 +248,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       topInput.min = "0";
       topInput.step = "1";
 
-      // Roof toggle — disabled for the first floor (no level below it to bind to)
+      // Roof toggle
       const roofLabel = document.createElement("label");
       roofLabel.className = "da-toggle";
       roofLabel.title = "When enabled, this level only renders when the level directly below it is active (roof behavior).";
@@ -243,6 +266,72 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
       row.append(thumb, nameInput, bottomInput, topInput, roofLabel);
       list.appendChild(row);
+      rowData.push({ row, nameInput, index: i });
+    }
+
+    // Second pass — attach a Visible Levels dropdown to each row.
+    // Dropdowns are appended directly to document.body so that position:fixed
+    // coordinates are always viewport-relative, bypassing Foundry's window transform.
+    for (let i = 0; i < rowData.length; i++) {
+      const { row } = rowData[i];
+
+      const wrap = document.createElement("div");
+      wrap.className = "da-vis-wrap";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "da-vis-btn";
+
+      const dropdown = document.createElement("div");
+      dropdown.className = "da-vis-dropdown";
+      dropdown.hidden = true;
+      document.body.appendChild(dropdown);
+      this._visDropdowns.push(dropdown);
+
+      for (let j = 0; j < rowData.length; j++) {
+        if (j === i) continue;
+        const optLabel = document.createElement("label");
+        optLabel.className = "da-vis-option";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.name = `levelVisibility[${i}][${j}]`;
+        this._visCheckboxes.set(`${i},${j}`, cb);
+        optLabel.append(cb, ` ${rowData[j].nameInput.value || `Floor ${j}`}`);
+        dropdown.appendChild(optLabel);
+      }
+
+      const updateBtn = () => {
+        const n = dropdown.querySelectorAll("input:checked").length;
+        btn.textContent = n === 0 ? "— ▾" : `${n} ▾`;
+      };
+      updateBtn();
+      dropdown.addEventListener("change", updateBtn);
+
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wasHidden = dropdown.hidden;
+        // Close all dropdowns, then open this one if it was closed.
+        this._visDropdowns.forEach(d => { d.hidden = true; });
+        if (wasHidden) {
+          const rect = btn.getBoundingClientRect();
+          dropdown.style.top = `${rect.bottom + 2}px`;
+          dropdown.style.left = `${rect.left}px`;
+          dropdown.hidden = false;
+          // Deferred outside-click handler so this very click doesn't close it immediately.
+          setTimeout(() => {
+            const closeOnOutside = (ev) => {
+              if (!dropdown.contains(ev.target) && ev.target !== btn) {
+                dropdown.hidden = true;
+                document.removeEventListener("click", closeOnOutside);
+              }
+            };
+            document.addEventListener("click", closeOnOutside);
+          }, 0);
+        }
+      });
+
+      wrap.appendChild(btn);
+      row.appendChild(wrap);
     }
   }
 
@@ -254,6 +343,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * @override
    */
   async _onClose(options) {
+    this._teardownVisDropdowns();
     document.querySelector(".da-door-tooltip")?.remove();
     return super._onClose(options);
   }
@@ -276,7 +366,13 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value?.trim() || `Floor ${i}`,
       bottom: parseInt(this.element.querySelector(`input[name="levelBottom[${i}]"]`)?.value ?? "", 10),
       top:    parseInt(this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "", 10),
-      isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false
+      isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false,
+      visibleLevels: this._floorPairs
+        .map((_, j) => {
+          if (j === i) return null;
+          return this._visCheckboxes.get(`${i},${j}`)?.checked ? j : null;
+        })
+        .filter(j => j !== null)
     }));
 
     const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, copyImages, doorTexture, doorSound, levelOverrides });

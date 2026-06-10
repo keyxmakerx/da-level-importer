@@ -1,10 +1,15 @@
 # 0.0.3
 
 ## [Added]
+- **Visible Levels** column in the Levels tab: each level row now has a compact dropdown button (`— ▾` / `N ▾`) listing all other levels as checkboxes. Any levels checked will be included in that level's `visibility.levels` array on import, controlling which other floors are simultaneously visible when that level is active.
+- Visible Levels and Is Roof work together: if both are configured, their results are merged (deduplicated) into a single `visibility.levels` array.
 - **Levels tab** in the importer dialog: after selecting a folder, a new "Levels" tab is populated with one row per detected floor — thumbnail, editable name, and editable bottom/top elevation inputs.
 - **Uniform floor height** field at the top of the Levels tab: changing this value recalculates all individual bottom/top inputs automatically, making it easy to set the same height for every level.
 - `scripts/constants.js` with `MODULE_ID` and `FLOOR_HEIGHT` as shared module-wide constants.
 - Per-level **Is Roof** toggle in the Levels tab: any level (except the first) can be flagged as a roof. The toggle carries a tooltip with the behavior description. Replaces the former global "Last Level is Roof" toggle.
+
+## [Changed]
+- Importer dialog width increased from 480 px to 620 px to accommodate the new Visible Levels column.
 
 ## [Fixed]
 - Removed Foundry's default orange focus outline and glow from buttons inside the importer and region-adder dialogs; buttons elsewhere in the VTT are unaffected.

@@ -105,8 +105,8 @@ async function _copyImage(srcUrl, destFolder, kebabStem, ext) {
  * @param {string} params.path                           Folder path inside that source.
  * @param {string} [params.backgroundColor="#000000"]   Scene background fill color.
  * @param {number} [params.gridAlpha=0]                 Grid overlay opacity (0–1).
- * @param {Array<{name?:string,bottom?:number,top?:number,isRoof?:boolean}>} [params.levelOverrides]
- *   Per-floor overrides for name, elevation, and roof behavior.
+ * @param {Array<{name?:string,bottom?:number,top?:number,isRoof?:boolean,visibleLevels?:number[]}>} [params.levelOverrides]
+ *   Per-floor overrides for name, elevation, roof behavior, and explicit visible-level indices.
  * @returns {Promise<Scene|null>}                        The created Scene, or null on abort.
  */
 export async function importFolder({ source, path, backgroundColor = "#000000", gridAlpha = 0, copyImages = false, doorTexture = "", doorSound = "", levelOverrides = [] }) {
@@ -209,11 +209,18 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
     };
   });
 
-  // Any level flagged as a roof only renders when the level directly below it is active.
+  // Build visibility.levels for each level by merging the isRoof shortcut
+  // (adds the immediately lower level) with any explicit visibleLevels selections.
+  // Deduplication ensures a level that appears in both is listed only once.
   levels.forEach((level, i) => {
-    if (i > 0 && levelOverrides[i]?.isRoof) {
-      level.visibility.levels = [levels[i - 1]._id];
+    const ov = levelOverrides[i];
+    const visIds = [];
+    if (i > 0 && ov?.isRoof) visIds.push(levels[i - 1]._id);
+    for (const j of (ov?.visibleLevels ?? [])) {
+      const id = levels[j]?._id;
+      if (id && !visIds.includes(id)) visIds.push(id);
     }
+    level.visibility.levels = visIds;
   });
 
   const walls = [];
