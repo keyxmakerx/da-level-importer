@@ -118,6 +118,12 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         this._levelState = new Map();
         this._initialLevelUid = this._floorPairs[0]?.uid ?? null;
         this._mediaSizes = new Map();
+        // Heuristic: a floor whose filename contains "roof" is pre-marked as a Roof
+        // (a default only — overridable under "Show advanced columns").
+        const roofs = this._floorPairs.filter(p => /\broof/i.test(p.stem));
+        if (roofs.length) {
+          ui.notifications.info(`DA Importer: detected ${roofs.length} roof layer(s) and pre-marked them as Roof — ${roofs.map(p => p.stem).join(", ")}. Use "Show advanced columns" to review.`);
+        }
         this._populateLevelsTab();
         this._probeMediaSizes(source);
       }
@@ -590,7 +596,8 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       const roofCheckbox = document.createElement("input");
       roofCheckbox.type = "checkbox";
       roofCheckbox.name = `levelIsRoof[${i}]`;
-      roofCheckbox.checked = st?.isRoof ?? false;
+      // Preserve an explicit choice; otherwise pre-tick when the filename says "roof".
+      roofCheckbox.checked = st ? !!st.isRoof : /\broof/i.test(pair.stem);
 
       const roofTrack = document.createElement("span");
       roofTrack.className = "da-toggle-track";

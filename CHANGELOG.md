@@ -1,3 +1,8 @@
+# 0.0.11
+
+## [Added]
+- A floor whose **filename contains "roof"** is now auto-detected and **pre-marked as Roof** (with a notification listing which), so a Dungeon Alchemist roof layer is handled without opening the advanced columns. It's just a default — review or change it under "Show advanced columns". Roof placement remains automatic (no elevation numbers to set); just make sure the roof is the top row.
+
 # 0.0.10
 
 ## [Fixed]
