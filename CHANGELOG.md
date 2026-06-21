@@ -1,3 +1,8 @@
+# 0.0.9
+
+## [Added]
+- **Drag-to-reorder floors**: drag a row by its **#** handle to change the stacking order. Bottom/Top elevations restack to the new order automatically, while each floor's **Name, Roof, Start, and Visible** settings travel with it — each floor now has a stable internal id, so edits survive reordering (and re-renders).
+
 # 0.0.8
 
 ## [Added]

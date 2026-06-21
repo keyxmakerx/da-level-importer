@@ -299,6 +299,20 @@
   user-select: none;
 }
 
+/* ── Drag-to-reorder floors ──────────────────────────────────── */
+#da-importer .da-level-index {
+  cursor: grab;
+}
+#da-importer .da-level-index:active {
+  cursor: grabbing;
+}
+#da-importer .da-level-row.da-row-dragging {
+  opacity: 0.45;
+}
+#da-importer .da-level-row.da-row-dragover {
+  box-shadow: inset 0 2px 0 0 var(--color-text-hyperlink, #88c0ff);
+}
+
 #da-importer .da-level-row .da-toggle {
   justify-self: center;
 }
