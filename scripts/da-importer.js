@@ -2,8 +2,9 @@
  * Dungeon Alchemist → Foundry v14 native Levels importer.
  *
  * Why this module exists:
- * Dungeon Alchemist exports multi-floor maps as sibling pairs of `.jpg` + `.json`
- * (one pair per floor). Foundry v14 natively supports multi-floor scenes through
+ * Dungeon Alchemist exports multi-floor maps as sibling pairs of one media file
+ * (image or video) + `.json` (one pair per floor). Foundry v14 natively supports
+ * multi-floor scenes through
  * `scene.levels[]`. This module bridges the two formats so the user gets a single
  * Scene with one Level per exported floor, populated with walls/doors/lights.
  *
@@ -105,20 +106,20 @@ async function _ensureUniqueSubfolder(baseName) {
 }
 
 /**
- * Download a remote image via fetch and upload it into `destFolder`
- * using FilePicker.upload().
+ * Download a remote media file (image or video) via fetch and upload it into
+ * `destFolder` using FilePicker.upload().
  *
- * @param {string} srcUrl      Original image URL (from FilePicker.browse).
+ * @param {string} srcUrl      Original media URL (from FilePicker.browse).
  * @param {string} destFolder  Target path, e.g. "worlds/x/da-imported/tavern".
  * @param {string} kebabStem   Kebab-case filename stem (no extension).
  * @param {string} ext         Lowercase file extension without dot.
  * @returns {Promise<string>}  The new path of the uploaded file.
  */
-async function _copyImage(srcUrl, destFolder, kebabStem, ext) {
+async function _copyMedia(srcUrl, destFolder, kebabStem, ext) {
   const FP = foundry.applications.apps.FilePicker.implementation;
 
   const response = await fetch(srcUrl);
-  if (!response.ok) throw new Error(`Failed to fetch image ${srcUrl}: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Failed to fetch media ${srcUrl}: HTTP ${response.status}`);
   const blob = await response.blob();
 
   const filename = `${kebabStem}.${ext}`;
@@ -170,10 +171,10 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
     return null;
   }
 
-  // ── Optional: copy images to the world folder ──────────────────────────────
-  // Why: by default, the imported Scene references images at their original
-  // FilePicker location. When copyImages is enabled the images are copied into
-  // worlds/<id>/da-imported/<map>/ and renamed to kebab-case, so the world
+  // ── Optional: copy media to the world folder ───────────────────────────────
+  // Why: by default, the imported Scene references each floor's media at its
+  // original FilePicker location. When copyImages is enabled the files are copied
+  // into worlds/<id>/da-imported/<map>/ and renamed to kebab-case, so the world
   // becomes self-contained and portable.
   if (copyImages) {
     const rawStem = _commonStem(pairs);
@@ -188,22 +189,22 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
 
     for (let i = 0; i < floors.length; i++) {
       const f = floors[i];
-      const originalUrl = f.jpg;
+      const originalUrl = f.media;
       const origFilename = decodeURIComponent(originalUrl.split("/").pop());
       const dotIdx = origFilename.lastIndexOf(".");
       const ext = dotIdx >= 0 ? origFilename.slice(dotIdx + 1).toLowerCase() : "jpg";
       const kebabFilename = _toKebab(f.stem);
       try {
         // floors[i] is a shallow copy of pairs[i] (see the Promise.all above),
-        // so we mutate floors[i].jpg directly — that is the reference used
+        // so we mutate floors[i].media directly — that is the reference used
         // when building levels[] below.
-        f.jpg = await _copyImage(originalUrl, destFolder, kebabFilename, ext);
+        f.media = await _copyMedia(originalUrl, destFolder, kebabFilename, ext);
       } catch (err) {
-        ui.notifications.error(`DA Importer: failed to copy image "${origFilename}" (${err.message})`);
+        ui.notifications.error(`DA Importer: failed to copy media "${origFilename}" (${err.message})`);
         return null;
       }
     }
-    console.log(`[DA Importer] images copied to "${destFolder}"`);
+    console.log(`[DA Importer] media copied to "${destFolder}"`);
   }
   // ────────────────────────────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
       name,
       elevation: { bottom, top },
       background: {
-        src: f.jpg,
+        src: f.media,
         color: backgroundColor,
         tint: "#ffffff",
         alphaThreshold: 0.75
@@ -330,7 +331,7 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
  * Exported so the importer dialog can inspect the pairs before the full import.
  *
  * @param {string[]} files  Full URLs returned by FilePicker.browse().
- * @returns {{stem:string, index:number, json:string, jpg:string}[]}
+ * @returns {{stem:string, index:number, json:string, media:string}[]}
  */
 export function collectFloorPairs(files) {
   const byStem = new Map();
@@ -370,7 +371,7 @@ export function collectFloorPairs(files) {
       stem,
       index: m ? parseInt(m[1], 10) : 0,
       json: entry.json,
-      jpg: entry.img
+      media: entry.img
     });
   }
   if (orphans.length) {

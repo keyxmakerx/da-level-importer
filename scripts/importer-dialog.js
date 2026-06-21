@@ -4,39 +4,52 @@ import { FLOOR_HEIGHT } from "./constants.js";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
- * Build a level thumbnail element for a background media path.
- * Video backgrounds (webm/mp4/m4v) use a muted, looping, autoplaying <video>
- * so the preview animates in place; static images use a plain <img>.
+ * Build a thumbnail element for a floor's background media path.
  *
- * @param {string} src        Media path/URL.
- * @param {string} className  Class to apply to the element (empty = none).
+ * Video backgrounds (webm/mp4/m4v) use a muted, looping, inline <video>; still
+ * images use a plain <img>. Pass `animate:true` to autoplay the video (used for
+ * the enlarged hover preview); the default leaves it paused on its first frame
+ * (`preload:"metadata"`) so a column of many floors doesn't run N decoders at
+ * once. A load/decode error tags the element `da-thumb-error` and warns.
+ *
+ * @param {string} src                    Media path/URL.
+ * @param {string} className              Class to apply (empty = none).
+ * @param {object} [opts]
+ * @param {boolean} [opts.animate=false]  Autoplay video (vs. paused first frame).
  * @returns {HTMLImageElement|HTMLVideoElement}
  */
-function _buildThumbEl(src, className) {
-  if (isVideoPath(src)) {
-    const video = document.createElement("video");
-    if (className) video.className = className;
-    video.src = src;
-    video.muted = true;
-    video.loop = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    return video;
+function _buildThumbEl(src, className, { animate = false } = {}) {
+  const isVideo = isVideoPath(src);
+  const el = document.createElement(isVideo ? "video" : "img");
+  if (className) el.className = className;
+  el.addEventListener("error", () => {
+    el.classList.add("da-thumb-error");
+    console.warn(`[DA Importer] could not load thumbnail media: ${src}`);
+  });
+  if (isVideo) {
+    el.muted = true;
+    el.loop = true;
+    el.playsInline = true;
+    el.autoplay = animate;
+    el.preload = animate ? "auto" : "metadata";
+  } else {
+    el.alt = "";
   }
-  const img = document.createElement("img");
-  if (className) img.className = className;
-  img.src = src;
-  img.alt = "";
-  return img;
+  el.src = src;
+  return el;
 }
 
 export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) {
-  /** @type {{stem:string, index:number, json:string, jpg:string}[]} */
+  /** @type {{stem:string, index:number, json:string, media:string}[]} */
   _floorPairs = [];
   /** Body-level dropdown elements that must be removed when the list is rebuilt or the dialog closes. */
   _visDropdowns = [];
   /** @type {Map<string, HTMLInputElement>} Keyed by "levelIndex,otherIndex" for fast lookup at import time. */
   _visCheckboxes = new Map();
+  /** Levels-tab video thumbnails currently mounted; paused/released on rebuild and close. */
+  _thumbVideos = [];
+  /** The single active document-level "click outside to close" handler for the Visible Levels dropdowns. */
+  _visOutsideHandler = null;
   /** Zero-based index of the level shown on scene load. Defaults to the first level. */
   _initialLevelIndex = 0;
   static DEFAULT_OPTIONS = {
@@ -200,13 +213,35 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
-   * Remove all dropdown elements previously appended to document.body and clear checkbox refs.
-   * Called before rebuilding the list and on dialog close.
+   * Remove all dropdown elements previously appended to document.body, drop the
+   * active outside-click handler, and clear checkbox refs. Called before
+   * rebuilding the list and on dialog close.
    */
   _teardownVisDropdowns() {
+    this._removeVisOutsideHandler();
     for (const d of this._visDropdowns) d.remove();
     this._visDropdowns = [];
     this._visCheckboxes.clear();
+  }
+
+  /** Remove the active "click outside to close" handler for the Visible Levels dropdowns, if any. */
+  _removeVisOutsideHandler() {
+    if (this._visOutsideHandler) {
+      document.removeEventListener("click", this._visOutsideHandler);
+      this._visOutsideHandler = null;
+    }
+  }
+
+  /**
+   * Pause and release every Levels-tab video thumbnail. Called before the list
+   * is rebuilt (innerHTML = "") and on close so detached <video> elements stop
+   * decoding instead of lingering until GC.
+   */
+  _teardownThumbVideos() {
+    for (const v of this._thumbVideos) {
+      try { v.pause(); v.removeAttribute("src"); v.load(); } catch (_) { /* ignore */ }
+    }
+    this._thumbVideos = [];
   }
 
   /**
@@ -221,6 +256,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    */
   _populateLevelsTab() {
     this._teardownVisDropdowns();
+    this._teardownThumbVideos();
 
     const placeholder = this.element?.querySelector(".da-levels-placeholder");
     const list = this.element?.querySelector(".da-levels-list");
@@ -259,14 +295,15 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       indexBadge.className = "da-level-index";
       indexBadge.textContent = String(i);
 
-      const thumb = _buildThumbEl(pair.jpg, "da-level-thumb");
+      const thumb = _buildThumbEl(pair.media, "da-level-thumb", { animate: false });
+      if (thumb.tagName === "VIDEO") this._thumbVideos.push(thumb);
 
-      // Hover tooltip — shows an enlarged version of the level image/video
+      // Hover tooltip — shows an enlarged, animated version of the level media
       let levelTooltip = null;
       thumb.addEventListener("mouseenter", () => {
         levelTooltip = document.createElement("div");
         levelTooltip.className = "da-level-tooltip";
-        const tooltipMedia = _buildThumbEl(pair.jpg, "");
+        const tooltipMedia = _buildThumbEl(pair.media, "", { animate: true });
         levelTooltip.appendChild(tooltipMedia);
         document.body.appendChild(levelTooltip);
         const rect = thumb.getBoundingClientRect();
@@ -274,6 +311,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         levelTooltip.style.top  = `${rect.top - 8}px`;
       });
       thumb.addEventListener("mouseleave", () => {
+        levelTooltip?.querySelector("video")?.pause();
         levelTooltip?.remove();
         levelTooltip = null;
       });
@@ -399,22 +437,25 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const wasHidden = dropdown.hidden;
-        // Close all dropdowns, then open this one if it was closed.
+        // Close all dropdowns (and drop any prior outside-click handler), then
+        // open this one if it was closed.
         this._visDropdowns.forEach(d => { d.hidden = true; });
+        this._removeVisOutsideHandler();
         if (wasHidden) {
           const rect = btn.getBoundingClientRect();
           dropdown.style.top = `${rect.bottom + 2}px`;
           dropdown.style.left = `${rect.left}px`;
           dropdown.hidden = false;
-          // Deferred outside-click handler so this very click doesn't close it immediately.
+          // Deferred outside-click handler so this very click doesn't close it
+          // immediately; tracked on the instance so it is never left dangling.
           setTimeout(() => {
-            const closeOnOutside = (ev) => {
+            this._visOutsideHandler = (ev) => {
               if (!dropdown.contains(ev.target) && ev.target !== btn) {
                 dropdown.hidden = true;
-                document.removeEventListener("click", closeOnOutside);
+                this._removeVisOutsideHandler();
               }
             };
-            document.addEventListener("click", closeOnOutside);
+            document.addEventListener("click", this._visOutsideHandler);
           }, 0);
         }
       });
@@ -433,8 +474,11 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    */
   async _onClose(options) {
     this._teardownVisDropdowns();
+    this._teardownThumbVideos();
     document.querySelector(".da-door-tooltip")?.remove();
-    document.querySelector(".da-level-tooltip")?.remove();
+    const levelTooltip = document.querySelector(".da-level-tooltip");
+    levelTooltip?.querySelector("video")?.pause();
+    levelTooltip?.remove();
     return super._onClose(options);
   }
 
