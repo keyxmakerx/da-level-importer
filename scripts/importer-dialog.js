@@ -1,5 +1,5 @@
 import { importFolder, collectFloorPairs, isVideoPath } from "./da-importer.js";
-import { FLOOR_HEIGHT, MODULE_ID, SETTING_IMPORTER_DEFAULTS } from "./constants.js";
+import { FLOOR_HEIGHT, MODULE_ID, SETTING_IMPORTER_DEFAULTS, MEDIA_SIZE_WARN_BYTES } from "./constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -54,6 +54,12 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   _initialLevelIndex = 0;
   /** Guards one-time restore of persisted dialog selections (applied on first render). */
   _restoredDefaults = false;
+  /** @type {Map<number, number>} Probed media sizes (bytes) keyed by floor index; re-applied to rows on render. */
+  _mediaSizes = new Map();
+  /** Monotonic token so a stale size-probe batch can't patch rows after a newer browse. */
+  _sizeProbeGen = 0;
+  /** AbortController for the in-flight size-probe batch (aborted on re-browse / close). */
+  _sizeAbort = null;
   static DEFAULT_OPTIONS = {
     id: "da-importer",
     tag: "form",
@@ -103,7 +109,9 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         // Re-selecting a folder with fewer floors must not leave the initial-level
         // index pointing past the end (the star would then highlight no row).
         this._initialLevelIndex = Math.min(this._initialLevelIndex, Math.max(0, this._floorPairs.length - 1));
+        this._mediaSizes = new Map();
         this._populateLevelsTab();
+        this._probeMediaSizes(source);
       }
     });
     await picker.browse("");
@@ -287,6 +295,74 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
+   * Probe each floor's media size via a HEAD request (Content-Length) and flag
+   * oversized floors in the Levels tab. Security/robustness measures:
+   * - Only LOCAL Foundry sources ("data"/"public") are probed; remote/absolute
+   *   URLs (e.g. S3) are skipped to avoid issuing cross-origin requests / leaking
+   *   the GM's address to arbitrary hosts.
+   * - `credentials:"omit"`, an AbortController timeout, and a per-browse
+   *   generation token so a slow or stale batch can neither hang the UI nor patch
+   *   rows from a newer folder selection.
+   * - Any failure (CORS, 405, missing Content-Length, network) is swallowed and
+   *   treated as "size unknown" — never warns, never blocks import.
+   *
+   * @param {string} source  FilePicker source the folder was browsed from.
+   */
+  async _probeMediaSizes(source) {
+    if (source !== "data" && source !== "public") return;
+    if (!this._floorPairs.length) return;
+
+    const gen = ++this._sizeProbeGen;
+    this._sizeAbort?.abort();
+    const controller = new AbortController();
+    this._sizeAbort = controller;
+    const timer = setTimeout(() => controller.abort(), 10000);
+
+    const oversize = [];
+    await Promise.all(this._floorPairs.map(async (pair, i) => {
+      try {
+        const res = await fetch(pair.media, { method: "HEAD", credentials: "omit", cache: "no-store", signal: controller.signal });
+        const len = res.ok ? res.headers.get("content-length") : null;
+        const bytes = len ? parseInt(len, 10) : NaN;
+        if (!Number.isFinite(bytes)) return;
+        if (gen !== this._sizeProbeGen) return; // superseded by a newer browse
+        this._mediaSizes.set(i, bytes);
+        this._applySizeBadge(i, bytes);
+        if (bytes >= MEDIA_SIZE_WARN_BYTES) oversize.push(i);
+      } catch (_) { /* unknown size — no warning */ }
+    }));
+    clearTimeout(timer);
+
+    if (gen === this._sizeProbeGen && oversize.length) {
+      const list = oversize.sort((a, b) => a - b).join(", ");
+      ui.notifications.warn(`DA Importer: ${oversize.length} floor(s) exceed ~50 MB (floor ${list}). Large videos slow scene loads; consider importing referenced-in-place (Copy Media off).`);
+    }
+  }
+
+  /**
+   * Mark a floor's thumbnail with its size; oversized media (≥ the recommended
+   * limit) gets a warning outline. Inserts only via attributes/`textContent`-safe
+   * channels (no innerHTML). Accepts an optional `thumbEl` for the build-time
+   * call (the row isn't in the DOM yet); otherwise looks the thumb up by index.
+   *
+   * @param {number} i
+   * @param {number} bytes
+   * @param {HTMLElement} [thumbEl]
+   */
+  _applySizeBadge(i, bytes, thumbEl) {
+    const thumb = thumbEl ?? this.element?.querySelector(`.da-level-row[data-level-index="${i}"] .da-level-thumb`);
+    if (!thumb) return;
+    const mb = (bytes / (1024 * 1024)).toFixed(1);
+    if (bytes >= MEDIA_SIZE_WARN_BYTES) {
+      thumb.classList.add("da-thumb-oversize");
+      thumb.title = `${mb} MB — exceeds Foundry's ~50 MB recommendation for animated maps`;
+    } else {
+      thumb.classList.remove("da-thumb-oversize");
+      thumb.title = `${mb} MB`;
+    }
+  }
+
+  /**
    * Rebuild the Levels tab rows from this._floorPairs.
    * Called after folder selection and after each render.
    * Shows a placeholder when no folder has been selected yet.
@@ -332,6 +408,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
       const row = document.createElement("div");
       row.className = "da-level-row";
+      row.dataset.levelIndex = String(i);
 
       const indexBadge = document.createElement("span");
       indexBadge.className = "da-level-index";
@@ -339,6 +416,8 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
       const thumb = _buildThumbEl(pair.media, "da-level-thumb", { animate: false });
       if (thumb.tagName === "VIDEO") this._thumbVideos.push(thumb);
+      // Re-apply a previously probed size badge (rows are rebuilt on every render).
+      if (this._mediaSizes.has(i)) this._applySizeBadge(i, this._mediaSizes.get(i), thumb);
 
       // Hover tooltip — shows an enlarged, animated version of the level media
       let levelTooltip = null;
@@ -517,6 +596,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   async _onClose(options) {
     this._teardownVisDropdowns();
     this._teardownThumbVideos();
+    this._sizeAbort?.abort();
     document.querySelector(".da-door-tooltip")?.remove();
     const levelTooltip = document.querySelector(".da-level-tooltip");
     levelTooltip?.querySelector("video")?.pause();
@@ -529,6 +609,20 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const source = this.element.querySelector("input[name='source']")?.value?.trim() || "data";
     if (!folder) {
       ui.notifications.warn("Please select a folder first.");
+      return;
+    }
+
+    // Validate elevation ranges first: each level's bottom must be below its top.
+    // Only fully-numeric rows are checked — a blank field falls back to a computed
+    // default downstream (always valid), so it must not be flagged here.
+    const badLevels = [];
+    for (let i = 0; i < this._floorPairs.length; i++) {
+      const b = parseInt(this.element.querySelector(`input[name="levelBottom[${i}]"]`)?.value ?? "", 10);
+      const t = parseInt(this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "", 10);
+      if (Number.isFinite(b) && Number.isFinite(t) && b >= t) badLevels.push(i);
+    }
+    if (badLevels.length) {
+      ui.notifications.error(`DA Importer: level(s) ${badLevels.join(", ")} have bottom ≥ top. Fix the elevation values before importing.`);
       return;
     }
 

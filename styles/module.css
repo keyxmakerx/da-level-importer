@@ -376,6 +376,12 @@
   border-color: #aa3333;
 }
 
+/* Oversized media (≥ the recommended limit) — amber ring + native tooltip. */
+#da-importer .da-level-thumb.da-thumb-oversize {
+  outline: 2px solid #e0a23b;
+  outline-offset: 1px;
+}
+
 /* ── Level thumb hover tooltip ───────────────────────────────── */
 .da-level-tooltip {
   position: fixed;

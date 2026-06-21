@@ -159,6 +159,14 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
     return null;
   }
 
+  // Heuristic: a folder should hold a single map. If the stems resolve to more
+  // than one base-name, warn (but proceed) — floors from different maps would
+  // otherwise be silently merged into one scene.
+  const mapStems = distinctMapStems(pairs);
+  if (mapStems.length > 1) {
+    ui.notifications.warn(`DA Importer: this folder appears to contain ${mapStems.length} maps (${mapStems.join(", ")}). Each folder should hold only one map; floors from different maps will be mixed into one scene.`);
+  }
+
   let floors;
   try {
     floors = await Promise.all(pairs.map(async (p) => {
@@ -390,6 +398,21 @@ export function collectFloorPairs(files) {
 function _commonStem(pairs) {
   const stems = pairs.map((p) => p.stem.replace(FLOOR_RE, ""));
   return stems[0];
+}
+
+/**
+ * Distinct map base-names across a set of pairs: each stem has its `-_NN` suffix
+ * stripped and is kebab-normalized (so case/accents don't create false
+ * positives, and floors with no numeric suffix are still compared). More than
+ * one entry means the folder likely mixes multiple maps, which the importer is
+ * not designed for — it pairs every media with a sibling JSON and names the
+ * scene from the first stem.
+ *
+ * @param {{stem:string}[]} pairs
+ * @returns {string[]} Unique normalized base-names (may be empty).
+ */
+export function distinctMapStems(pairs) {
+  return [...new Set(pairs.map((p) => _toKebab(p.stem.replace(FLOOR_RE, ""))))];
 }
 
 /**
