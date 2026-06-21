@@ -12,3 +12,9 @@ export const FLOOR_HEIGHT = 10;
  * selections (door texture/sound, scene colors, copy toggle) across opens.
  */
 export const SETTING_IMPORTER_DEFAULTS = "importerDefaults";
+
+/**
+ * Floor media at or above this size (bytes) is flagged in the Levels tab.
+ * Foundry recommends keeping animated maps under ~50 MB.
+ */
+export const MEDIA_SIZE_WARN_BYTES = 50 * 1024 * 1024;

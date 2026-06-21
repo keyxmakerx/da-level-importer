@@ -16,7 +16,7 @@ This module reads all pairs in a folder, parses each JSON for wall, door, and li
 
 ## Requirements
 
-- Each export folder must contain **only** the files for a single map. Do not mix exports from different maps in the same folder, as the importer will attempt to pair every image/video file with a sibling `.json` by filename stem.
+- Each export folder must contain **only** the files for a single map. Do not mix exports from different maps in the same folder, as the importer will attempt to pair every image/video file with a sibling `.json` by filename stem. (The importer warns if it detects more than one map in a folder.)
 - Foundry VTT **v14 or later** is required. The native Levels system used here is not available in earlier versions.
 - **Animated (video) floors:** Foundry accepts `.webm`, `.mp4`, and `.m4v` as animated Scene Level backgrounds. Keep video maps reasonably sized (Foundry recommends ~30 fps and under ~50 MB per map). Note that a placed video map may need a single click on the canvas before it begins playing — this is Foundry behavior, not the importer.
 
@@ -40,10 +40,12 @@ The dialog is tabbed and opens when you call `DA.Importer()` from a macro or fro
 - **Uniform floor height** field at the top: changing it recalculates all bottom/top inputs at once.
 - Per-level **Is Roof** toggle (available on every floor except the first): marks that level as a roof so it renders only when the floor directly below it is active.
 - **Visible Levels** column: each row has a dropdown (`— ▾` / `N ▾`) listing all other levels as checkboxes. Checked levels are added to that floor's `visibility.levels` array, controlling which other floors are simultaneously visible when that level is active. If both *Is Roof* and *Visible Levels* are configured, their results are merged (deduplicated) into a single array.
+- **Large-media warning**: floors whose media exceeds Foundry's ~50 MB recommendation for animated maps are flagged with an amber outline (hover the thumbnail for the exact size), plus a summary notification. Sizes are probed for local sources only.
+- **Elevation validation**: import is blocked with a message if any level's bottom is ≥ its top.
 
 ### Region Tool (`DA.AddRegion()`)
 
-Opens a dialog to configure a staircase or elevator transit region spanning multiple consecutive levels. Select a starting level, specify how many levels above and below should share the region, then click on the canvas to place it. A single region document is created and bound to all target levels using native `changeLevel` behavior.
+Opens a dialog to configure a staircase or elevator transit region spanning multiple consecutive levels. Select a starting level, specify how many levels above and below should share the region, then **click on the canvas to drop a one-square region — or drag to draw a larger footprint** (a live preview follows the cursor). A single region document is created and bound to all target levels using native `changeLevel` behavior. Once placed, you can move or resize the region with Foundry's native Region tools.
 
 ## Usage
 

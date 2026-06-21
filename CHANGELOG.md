@@ -1,3 +1,14 @@
+# 0.0.6
+
+## [Added]
+- **Drag-to-draw region placement**: when placing a staircase/elevator region (`DA.AddRegion()`) you can now *drag* on the canvas to draw the region's footprint, with a live preview following the cursor, instead of only dropping a fixed square. A plain click still drops the default one-grid-square region. (Once placed, a region can be moved/resized with Foundry's native Region tools.)
+- **Large-media warning** in the Levels tab: floors whose media exceeds Foundry's ~50 MB recommendation for animated maps get an amber outline + size tooltip and a one-line summary notification. Sizes are probed via a `HEAD` request for local sources (`data`/`public`) only.
+- **Elevation validation**: import is blocked with a clear message when any level's bottom is ≥ its top.
+- **Mixed-folder detection**: import warns when the selected folder appears to contain more than one map (multiple distinct base names), which would otherwise merge unrelated floors into one scene.
+
+## [Fixed]
+- Region rectangle shapes no longer carry the invalid `anchorX`/`anchorY`/`gridBased` fields (not part of v14's `RectangleShapeData`), and the region width/height are guarded to be strictly positive.
+
 # 0.0.5
 
 ## [Added]
