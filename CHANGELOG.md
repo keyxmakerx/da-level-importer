@@ -1,3 +1,9 @@
+# 0.0.7
+
+## [Added]
+- The Levels tab now **pre-fills each level's Name with the original filename** (and shows it on the thumbnail tooltip alongside the file size), so you can tell which row is which floor.
+- Every Levels-tab **column header has an explanatory hover tooltip**, and a help line clarifies that the defaults already stack floors correctly — you only edit a row to fine-tune.
+
 # 0.0.6
 
 ## [Added]

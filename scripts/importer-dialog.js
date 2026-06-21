@@ -352,13 +352,14 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   _applySizeBadge(i, bytes, thumbEl) {
     const thumb = thumbEl ?? this.element?.querySelector(`.da-level-row[data-level-index="${i}"] .da-level-thumb`);
     if (!thumb) return;
+    const stem = this._floorPairs[i]?.stem ?? "";
     const mb = (bytes / (1024 * 1024)).toFixed(1);
     if (bytes >= MEDIA_SIZE_WARN_BYTES) {
       thumb.classList.add("da-thumb-oversize");
-      thumb.title = `${mb} MB — exceeds Foundry's ~50 MB recommendation for animated maps`;
+      thumb.title = `${stem} — ${mb} MB (exceeds Foundry's ~50 MB recommendation)`;
     } else {
       thumb.classList.remove("da-thumb-oversize");
-      thumb.title = `${mb} MB`;
+      thumb.title = `${stem} — ${mb} MB`;
     }
   }
 
@@ -392,9 +393,20 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     // Header row
     const header = document.createElement("div");
     header.className = "da-levels-header";
-    for (const label of ["#", "", "Name", "Bottom", "Top", "Roof", "Start", "Visible"]) {
+    const headerCols = [
+      { label: "#",       title: "Floor order (0 = bottom-most)" },
+      { label: "",        title: "Map preview — hover for the original filename and size" },
+      { label: "Name",    title: "Level name — pre-filled from the original filename, editable" },
+      { label: "Bottom",  title: "Lower elevation of this floor, in grid units" },
+      { label: "Top",     title: "Upper elevation of this floor, in grid units" },
+      { label: "Roof",    title: "Show this level only when the floor directly below is active (ceilings/roofs)" },
+      { label: "Start",   title: "Which floor is shown when the scene first loads" },
+      { label: "Visible", title: "Which other floors stay visible while this one is active" }
+    ];
+    for (const col of headerCols) {
       const span = document.createElement("span");
-      span.textContent = label;
+      span.textContent = col.label;
+      span.title = col.title;
       header.appendChild(span);
     }
     list.appendChild(header);
@@ -416,6 +428,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
       const thumb = _buildThumbEl(pair.media, "da-level-thumb", { animate: false });
       if (thumb.tagName === "VIDEO") this._thumbVideos.push(thumb);
+      thumb.title = pair.stem;   // original filename (size is appended once probed)
       // Re-apply a previously probed size badge (rows are rebuilt on every render).
       if (this._mediaSizes.has(i)) this._applySizeBadge(i, this._mediaSizes.get(i), thumb);
 
@@ -440,8 +453,8 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       const nameInput = document.createElement("input");
       nameInput.type = "text";
       nameInput.name = `levelName[${i}]`;
-      nameInput.value = `Floor ${i}`;
-      nameInput.placeholder = "Level name";
+      nameInput.value = pair.stem;   // pre-fill with the original filename so floors are identifiable
+      nameInput.placeholder = `Floor ${i}`;
 
       const bottomInput = document.createElement("input");
       bottomInput.type = "number";
