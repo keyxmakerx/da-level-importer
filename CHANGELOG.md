@@ -1,3 +1,8 @@
+# 0.0.4
+
+## [Added]
+- **Animated map support**: floors exported as video — `.webm` (plus `.mp4` / `.m4v`) — are now accepted alongside the existing image formats (`.jpg`, `.jpeg`, `.png`, `.webp`) and become animated Scene Level backgrounds. The Levels tab previews video floors with a muted, looping inline player (both the row thumbnail and the hover tooltip). If a floor ships both an image and a video for the same name, the video takes precedence.
+
 # 0.0.3
 
 ## [Added]

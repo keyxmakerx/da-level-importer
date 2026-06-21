@@ -383,7 +383,8 @@
   pointer-events: none;
 }
 
-.da-level-tooltip img {
+.da-level-tooltip img,
+.da-level-tooltip video {
   display: block;
   width: 320px;
   height: 320px;

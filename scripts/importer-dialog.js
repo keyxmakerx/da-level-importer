@@ -1,7 +1,34 @@
-import { importFolder, collectFloorPairs } from "./da-importer.js";
+import { importFolder, collectFloorPairs, isVideoPath } from "./da-importer.js";
 import { FLOOR_HEIGHT } from "./constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/**
+ * Build a level thumbnail element for a background media path.
+ * Video backgrounds (webm/mp4/m4v) use a muted, looping, autoplaying <video>
+ * so the preview animates in place; static images use a plain <img>.
+ *
+ * @param {string} src        Media path/URL.
+ * @param {string} className  Class to apply to the element (empty = none).
+ * @returns {HTMLImageElement|HTMLVideoElement}
+ */
+function _buildThumbEl(src, className) {
+  if (isVideoPath(src)) {
+    const video = document.createElement("video");
+    if (className) video.className = className;
+    video.src = src;
+    video.muted = true;
+    video.loop = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    return video;
+  }
+  const img = document.createElement("img");
+  if (className) img.className = className;
+  img.src = src;
+  img.alt = "";
+  return img;
+}
 
 export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {{stem:string, index:number, json:string, jpg:string}[]} */
@@ -229,19 +256,15 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       indexBadge.className = "da-level-index";
       indexBadge.textContent = String(i);
 
-      const thumb = document.createElement("img");
-      thumb.className = "da-level-thumb";
-      thumb.src = pair.jpg;
-      thumb.alt = "";
+      const thumb = _buildThumbEl(pair.jpg, "da-level-thumb");
 
-      // Hover tooltip — shows an enlarged version of the level image
+      // Hover tooltip — shows an enlarged version of the level image/video
       let levelTooltip = null;
       thumb.addEventListener("mouseenter", () => {
         levelTooltip = document.createElement("div");
         levelTooltip.className = "da-level-tooltip";
-        const tooltipImg = document.createElement("img");
-        tooltipImg.src = pair.jpg;
-        levelTooltip.appendChild(tooltipImg);
+        const tooltipMedia = _buildThumbEl(pair.jpg, "");
+        levelTooltip.appendChild(tooltipMedia);
         document.body.appendChild(levelTooltip);
         const rect = thumb.getBoundingClientRect();
         levelTooltip.style.left = `${rect.left + rect.width / 2}px`;

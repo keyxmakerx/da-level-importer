@@ -8,7 +8,7 @@ Foundry VTT v14 module that imports a Dungeon Alchemist multi-level export and c
 
 # How it Works
 
-Dungeon Alchemist exports multi-floor maps as sibling file pairs — one `.jpg` image and one `.json` data file per floor, named with a numeric suffix (e.g. `TavernMap-_0.jpg`, `TavernMap-_0.json`, `TavernMap-_1.jpg`, `TavernMap-_1.json`).
+Dungeon Alchemist exports multi-floor maps as sibling file pairs — one image and one `.json` data file per floor, named with a numeric suffix (e.g. `TavernMap-_0.jpg`, `TavernMap-_0.json`, `TavernMap-_1.jpg`, `TavernMap-_1.json`). The image can be a static format (`.jpg`, `.jpeg`, `.png`, `.webp`) or an animated video (`.webm`, `.mp4`, `.m4v`); video floors are imported as animated Scene Level backgrounds.
 
 <p align="center"><img width="900" src="docs/importer-preview.webp"></p>
 
@@ -16,7 +16,7 @@ This module reads all pairs in a folder, parses each JSON for wall, door, and li
 
 ## Requirements
 
-- Each export folder must contain **only** the files for a single map. Do not mix exports from different maps in the same folder, as the importer will attempt to pair every `.jpg` with a sibling `.json` by filename stem.
+- Each export folder must contain **only** the files for a single map. Do not mix exports from different maps in the same folder, as the importer will attempt to pair every image/video file with a sibling `.json` by filename stem.
 - Foundry VTT **v14 or later** is required. The native Levels system used here is not available in earlier versions.
 
 ## Features

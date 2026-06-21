@@ -19,6 +19,30 @@ import { FLOOR_HEIGHT } from "./constants.js";
 const FLOOR_RE = /-_(\d+)$/;
 
 /**
+ * Background media accepted alongside each floor's `.json`. Foundry can use any
+ * of these as a Scene Level `background.src`; the VIDEO_EXTS render as animated
+ * textures, the IMAGE_EXTS as static backgrounds.
+ */
+const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp"];
+const VIDEO_EXTS = ["webm", "mp4", "m4v"];
+const MEDIA_EXTS = [...IMAGE_EXTS, ...VIDEO_EXTS];
+
+/**
+ * Whether a path points to a video Foundry renders as an animated texture
+ * (rather than a static image). Lets the dialog choose a <video> over an <img>
+ * for a floor's thumbnail.
+ *
+ * @param {string} path  File path or URL (trailing query/hash tolerated).
+ * @returns {boolean}
+ */
+export function isVideoPath(path) {
+  const clean = String(path).split(/[?#]/)[0];
+  const dot = clean.lastIndexOf(".");
+  const ext = dot >= 0 ? clean.slice(dot + 1).toLowerCase() : "";
+  return VIDEO_EXTS.includes(ext);
+}
+
+/**
  * Convert an arbitrary filename stem to strict kebab-case.
  * Replaces accented/special characters with ASCII equivalents,
  * then collapses any non-alphanumeric run into a single hyphen.
@@ -123,7 +147,7 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
   const pairs = collectFloorPairs(listing.files);
   console.log(`[DA Importer] found ${pairs.length} floor pair(s):`, pairs.map((p) => p.stem));
   if (pairs.length === 0) {
-    ui.notifications.warn("DA Importer: no Dungeon Alchemist floor pairs (.jpg + .json) found in folder.");
+    ui.notifications.warn("DA Importer: no Dungeon Alchemist floor pairs (image/video + .json) found in folder.");
     return null;
   }
 
@@ -294,7 +318,7 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
 }
 
 /**
- * Pair `.json` files with sibling image files and sort by the `-_NN` suffix.
+ * Pair `.json` files with sibling image/video files and sort by the `-_NN` suffix.
  * Exported so the importer dialog can inspect the pairs before the full import.
  *
  * @param {string[]} files  Full URLs returned by FilePicker.browse().
@@ -308,11 +332,17 @@ export function collectFloorPairs(files) {
     if (dot < 0) continue;
     const stem = base.slice(0, dot);
     const ext = base.slice(dot + 1).toLowerCase();
-    if (!["json", "jpg", "jpeg", "png", "webp"].includes(ext)) continue;
+    if (ext !== "json" && !MEDIA_EXTS.includes(ext)) continue;
     if (!byStem.has(stem)) byStem.set(stem, {});
     const entry = byStem.get(stem);
-    if (ext === "json") entry.json = f;
-    else entry.img = f;
+    if (ext === "json") {
+      entry.json = f;
+    } else if (!entry.img || (VIDEO_EXTS.includes(ext) && !VIDEO_EXTS.includes(entry.imgExt))) {
+      // One media file per floor. If a floor ships both a static image and a
+      // video, the video wins so the animated background takes precedence.
+      entry.img = f;
+      entry.imgExt = ext;
+    }
   }
 
   const pairs = [];
