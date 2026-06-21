@@ -1,8 +1,17 @@
 import { DAImporterDialog } from "./importer-dialog.js";
 import { DARegionAdderDialog } from "./region-adder-dialog.js";
-import { MODULE_ID } from "./constants.js";
+import { MODULE_ID, SETTING_IMPORTER_DEFAULTS } from "./constants.js";
 
 Hooks.once("init", () => {
+  // Per-client memory of the importer dialog's last-used selections (door
+  // texture/sound, scene colors, copy toggle). Hidden from the Settings UI.
+  game.settings.register(MODULE_ID, SETTING_IMPORTER_DEFAULTS, {
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {}
+  });
+
   game.modules.get(MODULE_ID).api = {
     Importer: () => new DAImporterDialog().render(true),
     AddRegion: () => new DARegionAdderDialog().render(true)

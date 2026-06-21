@@ -1,17 +1,59 @@
-import { importFolder, collectFloorPairs } from "./da-importer.js";
-import { FLOOR_HEIGHT } from "./constants.js";
+import { importFolder, collectFloorPairs, isVideoPath } from "./da-importer.js";
+import { FLOOR_HEIGHT, MODULE_ID, SETTING_IMPORTER_DEFAULTS } from "./constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
+/**
+ * Build a thumbnail element for a floor's background media path.
+ *
+ * Video backgrounds (webm/mp4/m4v) use a muted, looping, inline <video>; still
+ * images use a plain <img>. Pass `animate:true` to autoplay the video (used for
+ * the enlarged hover preview); the default leaves it paused on its first frame
+ * (`preload:"metadata"`) so a column of many floors doesn't run N decoders at
+ * once. A load/decode error tags the element `da-thumb-error` and warns.
+ *
+ * @param {string} src                    Media path/URL.
+ * @param {string} className              Class to apply (empty = none).
+ * @param {object} [opts]
+ * @param {boolean} [opts.animate=false]  Autoplay video (vs. paused first frame).
+ * @returns {HTMLImageElement|HTMLVideoElement}
+ */
+function _buildThumbEl(src, className, { animate = false } = {}) {
+  const isVideo = isVideoPath(src);
+  const el = document.createElement(isVideo ? "video" : "img");
+  if (className) el.className = className;
+  el.addEventListener("error", () => {
+    el.classList.add("da-thumb-error");
+    console.warn(`[DA Importer] could not load thumbnail media: ${src}`);
+  });
+  if (isVideo) {
+    el.muted = true;
+    el.loop = true;
+    el.playsInline = true;
+    el.autoplay = animate;
+    el.preload = animate ? "auto" : "metadata";
+  } else {
+    el.alt = "";
+  }
+  el.src = src;
+  return el;
+}
+
 export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) {
-  /** @type {{stem:string, index:number, json:string, jpg:string}[]} */
+  /** @type {{stem:string, index:number, json:string, media:string}[]} */
   _floorPairs = [];
   /** Body-level dropdown elements that must be removed when the list is rebuilt or the dialog closes. */
   _visDropdowns = [];
   /** @type {Map<string, HTMLInputElement>} Keyed by "levelIndex,otherIndex" for fast lookup at import time. */
   _visCheckboxes = new Map();
+  /** Levels-tab video thumbnails currently mounted; paused/released on rebuild and close. */
+  _thumbVideos = [];
+  /** The single active document-level "click outside to close" handler for the Visible Levels dropdowns. */
+  _visOutsideHandler = null;
   /** Zero-based index of the level shown on scene load. Defaults to the first level. */
   _initialLevelIndex = 0;
+  /** Guards one-time restore of persisted dialog selections (applied on first render). */
+  _restoredDefaults = false;
   static DEFAULT_OPTIONS = {
     id: "da-importer",
     tag: "form",
@@ -58,6 +100,9 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         } catch (_err) {
           this._floorPairs = [];
         }
+        // Re-selecting a folder with fewer floors must not leave the initial-level
+        // index pointing past the end (the star would then highlight no row).
+        this._initialLevelIndex = Math.min(this._initialLevelIndex, Math.max(0, this._floorPairs.length - 1));
         this._populateLevelsTab();
       }
     });
@@ -84,6 +129,42 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
+   * Restore the dialog's persisted selections (door texture/sound, scene colors,
+   * copy toggle) remembered per client across opens, so the user doesn't
+   * reconfigure them every import. Applied once on first render; the guard keeps
+   * later re-renders from clobbering in-progress edits.
+   */
+  _restoreSavedDefaults() {
+    if (this._restoredDefaults) return;
+    this._restoredDefaults = true;
+    let saved;
+    try { saved = game.settings.get(MODULE_ID, SETTING_IMPORTER_DEFAULTS); }
+    catch (_) { return; }
+    if (!saved || typeof saved !== "object") return;
+
+    const setValue = (selector, value) => {
+      if (value === undefined || value === null) return;
+      const el = this.element.querySelector(selector);
+      if (el) el.value = String(value);
+    };
+    setValue("input[name='backgroundColor']", saved.backgroundColor);
+    setValue("input[name='gridAlpha']", saved.gridAlpha);
+    setValue("select[name='doorTexture']", saved.doorTexture);
+    setValue("select[name='doorSound']", saved.doorSound);
+    const copyEl = this.element.querySelector("input[name='copyImages']");
+    if (copyEl && typeof saved.copyImages === "boolean") copyEl.checked = saved.copyImages;
+  }
+
+  /** Persist the dialog's current scene/door selections for the next open. */
+  _saveCurrentDefaults({ backgroundColor, gridAlpha, copyImages, doorTexture, doorSound }) {
+    try {
+      game.settings.set(MODULE_ID, SETTING_IMPORTER_DEFAULTS, {
+        backgroundColor, gridAlpha, copyImages, doorTexture, doorSound
+      });
+    } catch (_) { /* setting unavailable — non-fatal */ }
+  }
+
+  /**
    * Wire the grid-alpha range input to its adjacent display span, set up tab
    * switching, and bind the door texture preview image.
    * Triggered by the ApplicationV2 _onRender lifecycle stage after each render.
@@ -93,6 +174,10 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * @override
    */
   _onRender(_context, _options) {
+    // Restore persisted selections before wiring inputs, so the range display
+    // and door preview below reflect the restored values.
+    this._restoreSavedDefaults();
+
     // Range slider display sync
     const range = this.element.querySelector("input[name='gridAlpha']");
     const display = this.element.querySelector(".range-value");
@@ -170,13 +255,35 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
-   * Remove all dropdown elements previously appended to document.body and clear checkbox refs.
-   * Called before rebuilding the list and on dialog close.
+   * Remove all dropdown elements previously appended to document.body, drop the
+   * active outside-click handler, and clear checkbox refs. Called before
+   * rebuilding the list and on dialog close.
    */
   _teardownVisDropdowns() {
+    this._removeVisOutsideHandler();
     for (const d of this._visDropdowns) d.remove();
     this._visDropdowns = [];
     this._visCheckboxes.clear();
+  }
+
+  /** Remove the active "click outside to close" handler for the Visible Levels dropdowns, if any. */
+  _removeVisOutsideHandler() {
+    if (this._visOutsideHandler) {
+      document.removeEventListener("click", this._visOutsideHandler);
+      this._visOutsideHandler = null;
+    }
+  }
+
+  /**
+   * Pause and release every Levels-tab video thumbnail. Called before the list
+   * is rebuilt (innerHTML = "") and on close so detached <video> elements stop
+   * decoding instead of lingering until GC.
+   */
+  _teardownThumbVideos() {
+    for (const v of this._thumbVideos) {
+      try { v.pause(); v.removeAttribute("src"); v.load(); } catch (_) { /* ignore */ }
+    }
+    this._thumbVideos = [];
   }
 
   /**
@@ -191,6 +298,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    */
   _populateLevelsTab() {
     this._teardownVisDropdowns();
+    this._teardownThumbVideos();
 
     const placeholder = this.element?.querySelector(".da-levels-placeholder");
     const list = this.element?.querySelector(".da-levels-list");
@@ -229,25 +337,23 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       indexBadge.className = "da-level-index";
       indexBadge.textContent = String(i);
 
-      const thumb = document.createElement("img");
-      thumb.className = "da-level-thumb";
-      thumb.src = pair.jpg;
-      thumb.alt = "";
+      const thumb = _buildThumbEl(pair.media, "da-level-thumb", { animate: false });
+      if (thumb.tagName === "VIDEO") this._thumbVideos.push(thumb);
 
-      // Hover tooltip — shows an enlarged version of the level image
+      // Hover tooltip — shows an enlarged, animated version of the level media
       let levelTooltip = null;
       thumb.addEventListener("mouseenter", () => {
         levelTooltip = document.createElement("div");
         levelTooltip.className = "da-level-tooltip";
-        const tooltipImg = document.createElement("img");
-        tooltipImg.src = pair.jpg;
-        levelTooltip.appendChild(tooltipImg);
+        const tooltipMedia = _buildThumbEl(pair.media, "", { animate: true });
+        levelTooltip.appendChild(tooltipMedia);
         document.body.appendChild(levelTooltip);
         const rect = thumb.getBoundingClientRect();
         levelTooltip.style.left = `${rect.left + rect.width / 2}px`;
         levelTooltip.style.top  = `${rect.top - 8}px`;
       });
       thumb.addEventListener("mouseleave", () => {
+        levelTooltip?.querySelector("video")?.pause();
         levelTooltip?.remove();
         levelTooltip = null;
       });
@@ -373,22 +479,25 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const wasHidden = dropdown.hidden;
-        // Close all dropdowns, then open this one if it was closed.
+        // Close all dropdowns (and drop any prior outside-click handler), then
+        // open this one if it was closed.
         this._visDropdowns.forEach(d => { d.hidden = true; });
+        this._removeVisOutsideHandler();
         if (wasHidden) {
           const rect = btn.getBoundingClientRect();
           dropdown.style.top = `${rect.bottom + 2}px`;
           dropdown.style.left = `${rect.left}px`;
           dropdown.hidden = false;
-          // Deferred outside-click handler so this very click doesn't close it immediately.
+          // Deferred outside-click handler so this very click doesn't close it
+          // immediately; tracked on the instance so it is never left dangling.
           setTimeout(() => {
-            const closeOnOutside = (ev) => {
+            this._visOutsideHandler = (ev) => {
               if (!dropdown.contains(ev.target) && ev.target !== btn) {
                 dropdown.hidden = true;
-                document.removeEventListener("click", closeOnOutside);
+                this._removeVisOutsideHandler();
               }
             };
-            document.addEventListener("click", closeOnOutside);
+            document.addEventListener("click", this._visOutsideHandler);
           }, 0);
         }
       });
@@ -407,8 +516,11 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    */
   async _onClose(options) {
     this._teardownVisDropdowns();
+    this._teardownThumbVideos();
     document.querySelector(".da-door-tooltip")?.remove();
-    document.querySelector(".da-level-tooltip")?.remove();
+    const levelTooltip = document.querySelector(".da-level-tooltip");
+    levelTooltip?.querySelector("video")?.pause();
+    levelTooltip?.remove();
     return super._onClose(options);
   }
 
@@ -425,6 +537,9 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const copyImages = this.element.querySelector("input[name='copyImages']")?.checked ?? false;
     const doorTexture = this.element.querySelector("select[name='doorTexture']")?.value || "";
     const doorSound   = this.element.querySelector("select[name='doorSound']")?.value   || "";
+
+    // Remember these selections for the next time the dialog is opened.
+    this._saveCurrentDefaults({ backgroundColor, gridAlpha, copyImages, doorTexture, doorSound });
 
     const levelOverrides = this._floorPairs.map((_, i) => ({
       name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value?.trim() || `Floor ${i}`,
