@@ -65,10 +65,12 @@ DA.AddRegion()
 
 # 📦 Installation
 
-Install via the Foundry VTT Module browser or use this manifest link:
+Install via the Foundry VTT Module browser or use this manifest link.
+
+> **Testing build:** this manifest currently points to the `claude/festive-newton-i8l7nk` branch so the in-progress features can be tested before release. It will be repointed to `main` once that work is merged.
 
 ```javascript
-https://raw.githubusercontent.com/brunocalado/da-level-importer/main/module.json
+https://raw.githubusercontent.com/keyxmakerx/da-level-importer/refs/heads/claude/festive-newton-i8l7nk/module.json
 ```
 
 # ⚖️ Credits & License
