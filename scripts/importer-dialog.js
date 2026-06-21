@@ -1,5 +1,5 @@
 import { importFolder, collectFloorPairs, isVideoPath } from "./da-importer.js";
-import { FLOOR_HEIGHT } from "./constants.js";
+import { FLOOR_HEIGHT, MODULE_ID, SETTING_IMPORTER_DEFAULTS } from "./constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -52,6 +52,8 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   _visOutsideHandler = null;
   /** Zero-based index of the level shown on scene load. Defaults to the first level. */
   _initialLevelIndex = 0;
+  /** Guards one-time restore of persisted dialog selections (applied on first render). */
+  _restoredDefaults = false;
   static DEFAULT_OPTIONS = {
     id: "da-importer",
     tag: "form",
@@ -127,6 +129,42 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
+   * Restore the dialog's persisted selections (door texture/sound, scene colors,
+   * copy toggle) remembered per client across opens, so the user doesn't
+   * reconfigure them every import. Applied once on first render; the guard keeps
+   * later re-renders from clobbering in-progress edits.
+   */
+  _restoreSavedDefaults() {
+    if (this._restoredDefaults) return;
+    this._restoredDefaults = true;
+    let saved;
+    try { saved = game.settings.get(MODULE_ID, SETTING_IMPORTER_DEFAULTS); }
+    catch (_) { return; }
+    if (!saved || typeof saved !== "object") return;
+
+    const setValue = (selector, value) => {
+      if (value === undefined || value === null) return;
+      const el = this.element.querySelector(selector);
+      if (el) el.value = String(value);
+    };
+    setValue("input[name='backgroundColor']", saved.backgroundColor);
+    setValue("input[name='gridAlpha']", saved.gridAlpha);
+    setValue("select[name='doorTexture']", saved.doorTexture);
+    setValue("select[name='doorSound']", saved.doorSound);
+    const copyEl = this.element.querySelector("input[name='copyImages']");
+    if (copyEl && typeof saved.copyImages === "boolean") copyEl.checked = saved.copyImages;
+  }
+
+  /** Persist the dialog's current scene/door selections for the next open. */
+  _saveCurrentDefaults({ backgroundColor, gridAlpha, copyImages, doorTexture, doorSound }) {
+    try {
+      game.settings.set(MODULE_ID, SETTING_IMPORTER_DEFAULTS, {
+        backgroundColor, gridAlpha, copyImages, doorTexture, doorSound
+      });
+    } catch (_) { /* setting unavailable — non-fatal */ }
+  }
+
+  /**
    * Wire the grid-alpha range input to its adjacent display span, set up tab
    * switching, and bind the door texture preview image.
    * Triggered by the ApplicationV2 _onRender lifecycle stage after each render.
@@ -136,6 +174,10 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * @override
    */
   _onRender(_context, _options) {
+    // Restore persisted selections before wiring inputs, so the range display
+    // and door preview below reflect the restored values.
+    this._restoreSavedDefaults();
+
     // Range slider display sync
     const range = this.element.querySelector("input[name='gridAlpha']");
     const display = this.element.querySelector(".range-value");
@@ -495,6 +537,9 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const copyImages = this.element.querySelector("input[name='copyImages']")?.checked ?? false;
     const doorTexture = this.element.querySelector("select[name='doorTexture']")?.value || "";
     const doorSound   = this.element.querySelector("select[name='doorSound']")?.value   || "";
+
+    // Remember these selections for the next time the dialog is opened.
+    this._saveCurrentDefaults({ backgroundColor, gridAlpha, copyImages, doorTexture, doorSound });
 
     const levelOverrides = this._floorPairs.map((_, i) => ({
       name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value?.trim() || `Floor ${i}`,

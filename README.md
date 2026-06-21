@@ -18,6 +18,7 @@ This module reads all pairs in a folder, parses each JSON for wall, door, and li
 
 - Each export folder must contain **only** the files for a single map. Do not mix exports from different maps in the same folder, as the importer will attempt to pair every image/video file with a sibling `.json` by filename stem.
 - Foundry VTT **v14 or later** is required. The native Levels system used here is not available in earlier versions.
+- **Animated (video) floors:** Foundry accepts `.webm`, `.mp4`, and `.m4v` as animated Scene Level backgrounds. Keep video maps reasonably sized (Foundry recommends ~30 fps and under ~50 MB per map). Note that a placed video map may need a single click on the canvas before it begins playing — this is Foundry behavior, not the importer.
 
 ## Features
 
@@ -26,7 +27,8 @@ This module reads all pairs in a folder, parses each JSON for wall, door, and li
 The dialog is tabbed and opens when you call `DA.Importer()` from a macro or from the **DA Level Importer** button injected in the Scenes directory sidebar.
 
 #### Scene Defaults tab
-- **Copy Images to World** toggle (off by default): copies all floor images into `worlds/<your-world>/da-imported/<map-name>/` and renames them to `kebab-case` for portability.
+- **Copy Media to World** toggle (off by default): copies all floor media (images *and* videos) into `worlds/<your-world>/da-imported/<map-name>/` and renames them to `kebab-case` for portability.
+- The dialog remembers your last-used **door texture, door sound, background color, grid opacity, and Copy Media toggle** per browser and restores them the next time you open it.
 
 #### Doors tab
 - **Door texture selector** with 25 Foundry canvas door options and a real-time hover preview.
@@ -34,7 +36,7 @@ The dialog is tabbed and opens when you call `DA.Importer()` from a macro or fro
 - Any wall exported with `door=1` automatically receives the selected texture (with swing animation) and sound key on import.
 
 #### Levels tab
-- One row per detected floor showing a thumbnail, an editable name, and editable **bottom / top elevation** inputs.
+- One row per detected floor showing a thumbnail, an editable name, and editable **bottom / top elevation** inputs. Video floors show a paused first frame in the row and animate in the enlarged hover preview.
 - **Uniform floor height** field at the top: changing it recalculates all bottom/top inputs at once.
 - Per-level **Is Roof** toggle (available on every floor except the first): marks that level as a roof so it renders only when the floor directly below it is active.
 - **Visible Levels** column: each row has a dropdown (`— ▾` / `N ▾`) listing all other levels as checkboxes. Checked levels are added to that floor's `visibility.levels` array, controlling which other floors are simultaneously visible when that level is active. If both *Is Roof* and *Visible Levels* are configured, their results are merged (deduplicated) into a single array.

@@ -1,3 +1,20 @@
+# 0.0.5
+
+## [Added]
+- The importer dialog now remembers your last-used **door texture, door sound, background color, grid opacity, and Copy Media toggle** per browser (a hidden client-scoped setting) and restores them on open.
+- Video floors are previewed with a muted, looping **hover** player; the small row thumbnail sits paused on its first frame so a tall building doesn't run one video decoder per floor.
+- Broken or undecodable floor media now shows a hatched placeholder (plus a console warning) instead of a blank thumbnail box.
+
+## [Fixed]
+- Wall **movement** restriction no longer emits the invalid value `10`: Foundry's `WALL_MOVEMENT_TYPES` defines only `NONE` (0) and `NORMAL` (20), so movement now maps to `0`/`20` while sight/sound keep the `0`/`10`/`20` (none/limited/normal) mapping.
+- Removed `offsetX`/`offsetY`/`rotation` from each level's `textures` block — these were removed from Foundry's TextureData in v14.354.
+- Lights are now stamped at their level's **resolved** bottom elevation (honoring per-level overrides) instead of a recomputed default.
+- When a floor ships more than one media file (e.g. both `.jpg` and `.webp`), the importer now picks **deterministically** by a priority order (video > webp > png > jpg) instead of depending on the order files are listed.
+- Unpaired files (a `.json` with no media, or media with no `.json`) are now logged to the console instead of being silently dropped.
+
+## [Changed]
+- Renamed the **"Copy Images to World"** toggle to **"Copy Media to World"** — it already handled video files.
+
 # 0.0.4
 
 ## [Added]
