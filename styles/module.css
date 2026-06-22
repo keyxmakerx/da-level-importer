@@ -1,11 +1,9 @@
 /* ── Scenes directory sidebar button ─────────────────────────── */
 .da-importer-sidebar-btn,
-.da-edit-sidebar-btn,
 .da-region-sidebar-btn {
   width: calc(100% - 16px);
   margin: 0px 8px 0;
 }
-.da-edit-sidebar-btn,
 .da-region-sidebar-btn {
   margin-top: 4px;
 }
@@ -13,14 +11,6 @@
 /* Solid background — prevents the window content from being see-through */
 #da-importer .window-content {
   background: var(--color-cool-5, #1a1a2e);
-}
-
-/* Edit-mode: only the Levels tab is relevant — hide the folder picker and the
-   Scene Defaults / Doors tab buttons (the Levels tab is activated on render). */
-#da-importer.da-mode-edit .da-folder-group,
-#da-importer.da-mode-edit .da-tab-btn[data-tab="scene"],
-#da-importer.da-mode-edit .da-tab-btn[data-tab="doors"] {
-  display: none;
 }
 
 #da-importer .form-fields {

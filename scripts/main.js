@@ -14,13 +14,6 @@ Hooks.once("init", () => {
 
   game.modules.get(MODULE_ID).api = {
     Importer: () => new DAImporterDialog().render(true),
-    EditLevels: () => {
-      const scene = canvas.scene;
-      if (!scene) { ui.notifications.warn("DA: open a scene before editing its levels."); return; }
-      const count = scene.levels?.size ?? scene.levels?.length ?? 0;
-      if (!count) { ui.notifications.warn("DA: the current scene has no Levels to edit."); return; }
-      new DAImporterDialog({ mode: "edit", scene }).render(true);
-    },
     AddRegion: () => new DARegionAdderDialog().render(true)
   };
 });
@@ -50,13 +43,6 @@ Hooks.on("renderSceneDirectory", (_app, html) => {
   importBtn.innerHTML = '<i class="fas fa-file-import"></i> DA Level Importer';
   importBtn.addEventListener("click", () => api.Importer());
 
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "da-edit-sidebar-btn";
-  editBtn.innerHTML = '<i class="fas fa-pen-to-square"></i> DA Edit Levels';
-  editBtn.dataset.tooltip = "Edit the levels of the scene you're viewing";
-  editBtn.addEventListener("click", () => api.EditLevels());
-
   const regionBtn = document.createElement("button");
   regionBtn.type = "button";
   regionBtn.className = "da-region-sidebar-btn";
@@ -69,6 +55,5 @@ Hooks.on("renderSceneDirectory", (_app, html) => {
   const actionButtons = header.querySelector(".action-buttons") ?? header.querySelector(".header-actions");
   const anchor = actionButtons ? actionButtons.nextSibling : null;
   header.insertBefore(importBtn, anchor);
-  header.insertBefore(editBtn, anchor);
   header.insertBefore(regionBtn, anchor);
 });

@@ -1,5 +1,4 @@
 import { importFolder, collectFloorPairs, isVideoPath } from "./da-importer.js";
-import { getSceneLevels } from "./region-adder.js";
 import { FLOOR_HEIGHT, MODULE_ID, SETTING_IMPORTER_DEFAULTS, MEDIA_SIZE_WARN_BYTES } from "./constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -67,25 +66,6 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   _sizeAbort = null;
   /** Levels-tab "Show advanced columns" state (Roof / Start / Visible); persisted across re-renders. */
   _advancedView = false;
-  /** "create" (import a folder into a new scene) or "edit" (edit an existing scene's levels). */
-  _mode = "create";
-  /** The scene being edited in edit-mode (the scene currently on the canvas). */
-  _editScene = null;
-  /** Guards one-time hydration of edit-mode rows from the scene's levels. */
-  _editHydrated = false;
-
-  /**
-   * @param {object} [options]
-   * @param {"create"|"edit"} [options.mode]  Dialog mode; defaults to "create".
-   * @param {Scene} [options.scene]           Scene to edit (edit-mode only).
-   */
-  constructor(options = {}) {
-    super(options);
-    if (options.mode === "edit") {
-      this._mode = "edit";
-      this._editScene = options.scene ?? null;
-    }
-  }
 
   static DEFAULT_OPTIONS = {
     id: "da-importer",
@@ -94,7 +74,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       closeOnSubmit: false
     },
     window: {
-      title: "Dungeon Alchemist Level Importer",
+      title: "Dungeon Alchemist Toolkit",
       resizable: false
     },
     position: {
@@ -110,102 +90,9 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
   static PARTS = {
     form: {
-      template: "modules/da-level-importer/templates/importer.hbs"
+      template: "modules/dungeon-alchemist-toolkit/templates/importer.hbs"
     }
   };
-
-  /** @override — window title reflects the mode. */
-  get title() {
-    return this._mode === "edit" ? "Edit Scene Levels" : "Dungeon Alchemist Level Importer";
-  }
-
-  /**
-   * Edit-mode only: hydrate the Levels-tab rows from the target scene's existing
-   * `Level` documents (keyed by their real `_id`, sorted bottom-up). Runs once.
-   * Each row reuses the create-mode machinery: `uid` = the level `_id`, the
-   * thumbnail = the level background, and `_levelState` is seeded from the level's
-   * name / elevation / visibility. `initialLevelUid` = the scene's `initialLevel`.
-   */
-  _hydrateEditScene() {
-    if (this._editHydrated || this._mode !== "edit" || !this._editScene) return;
-    this._editHydrated = true;
-
-    const levels = getSceneLevels(this._editScene); // sorted by elevation.bottom
-    this._floorPairs = levels.map((lvl, i) => ({
-      uid: lvl._id,
-      levelId: lvl._id,
-      stem: lvl.name || `Floor ${i}`,
-      media: lvl.background?.src ?? "",
-      json: null
-    }));
-    this._levelState = new Map();
-    for (const lvl of levels) {
-      this._levelState.set(lvl._id, {
-        name:   lvl.name ?? "",
-        bottom: String(lvl.elevation?.bottom ?? 0),
-        top:    String(lvl.elevation?.top ?? 0),
-        // The raw visible set round-trips; we don't reverse-engineer the roof shortcut.
-        isRoof: false,
-        visible: new Set(lvl.visibility?.levels ?? [])
-      });
-    }
-    this._initialLevelUid = this._editScene.initialLevel ?? this._floorPairs[0]?.uid ?? null;
-  }
-
-  /**
-   * Edit-mode only: write the Levels-tab edits back to the existing scene. Updates
-   * each `Level` in place by `_id` (rename / re-elevate / reorder via `sort` /
-   * visibility), which keeps every wall/light/region `levels` binding valid with
-   * no re-binding. v1 does not add or delete levels.
-   */
-  async _applyLevelEdits() {
-    const scene = this._editScene;
-    if (!scene) { ui.notifications.error("DA: no scene to edit."); return; }
-    this._captureRowState();
-
-    const bad = [];
-    this._floorPairs.forEach((pair, i) => {
-      const st = this._levelState.get(pair.uid);
-      const b = parseInt(st?.bottom ?? "", 10);
-      const t = parseInt(st?.top ?? "", 10);
-      if (Number.isFinite(b) && Number.isFinite(t) && b >= t) bad.push(i);
-    });
-    if (bad.length) {
-      ui.notifications.error(`DA: level(s) ${bad.join(", ")} have bottom ≥ top. Fix the elevation values.`);
-      return;
-    }
-
-    const updates = this._floorPairs.map((pair, i) => {
-      const st = this._levelState.get(pair.uid) ?? {};
-      const visible = new Set(st.visible ?? []);
-      if (i > 0 && st.isRoof) visible.add(this._floorPairs[i - 1].uid); // roof shortcut -> show floor below
-      visible.delete(pair.uid); // never include self
-      const update = {
-        _id: pair.uid,
-        name: (st.name ?? "").trim() || `Floor ${i}`,
-        sort: i,
-        "visibility.levels": [...visible]
-      };
-      // Only write finite elevations; a blank field keeps the level's current value.
-      const b = parseInt(st.bottom, 10);
-      const t = parseInt(st.top, 10);
-      if (Number.isFinite(b)) update["elevation.bottom"] = b;
-      if (Number.isFinite(t)) update["elevation.top"] = t;
-      return update;
-    });
-
-    try {
-      await scene.updateEmbeddedDocuments("Level", updates);
-      if (this._initialLevelUid && this._initialLevelUid !== scene.initialLevel) {
-        await scene.update({ initialLevel: this._initialLevelUid });
-      }
-      ui.notifications.info(`DA: updated ${updates.length} level(s) on "${scene.name}".`);
-      this.close();
-    } catch (err) {
-      ui.notifications.error(`DA: failed to update levels (${err.message})`);
-      console.error(err);
-    }
-  }
 
   static async #onBrowse(_event, _target) {
     const FilePicker = foundry.applications.apps.FilePicker.implementation;
@@ -310,12 +197,9 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * @override
    */
   _onRender(_context, _options) {
-    // Edit-mode: hydrate rows from the scene's existing levels (once) before anything else.
-    this._hydrateEditScene();
-
     // Restore persisted selections before wiring inputs, so the range display
-    // and door preview below reflect the restored values (create-mode only).
-    if (this._mode !== "edit") this._restoreSavedDefaults();
+    // and door preview below reflect the restored values.
+    this._restoreSavedDefaults();
 
     // Range slider display sync
     const range = this.element.querySelector("input[name='gridAlpha']");
@@ -405,15 +289,6 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const advHelp = this.element.querySelector(".da-adv-help");
     if (advHelpBtn && advHelp) {
       advHelpBtn.addEventListener("click", () => { advHelp.hidden = !advHelp.hidden; });
-    }
-
-    // Edit-mode UI: relabel the action button, hide the import-only controls
-    // (folder picker / Scene Defaults / Doors), and show the Levels tab.
-    if (this._mode === "edit") {
-      this.element.classList.add("da-mode-edit");
-      const importBtn = this.element.querySelector("[data-action='import']");
-      if (importBtn) importBtn.innerHTML = '<i class="fas fa-floppy-disk"></i> Apply Changes';
-      this.element.querySelector(".da-tab-btn[data-tab='levels']")?.click();
     }
 
     // Restore levels tab rows after any re-render.
@@ -891,7 +766,6 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   static async #onImport(_event, _target) {
-    if (this._mode === "edit") { await this._applyLevelEdits(); return; }
     const folder = this.element.querySelector("input[name='folder']")?.value?.trim();
     const source = this.element.querySelector("input[name='source']")?.value?.trim() || "data";
     if (!folder) {
