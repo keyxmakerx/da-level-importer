@@ -85,6 +85,22 @@ export function getPortalLinkGroups(scene) {
   return groups;
 }
 
+/** First level id a region is bound to (portals are single-level). */
+export function regionLevelId(region) {
+  const lv = region?.levels;
+  if (!lv) return null;
+  if (lv instanceof Set) return [...lv][0] ?? null;
+  if (Array.isArray(lv)) return lv[0] ?? null;
+  return [...(lv.values?.() ?? [])][0] ?? null;
+}
+
+/** Center point (world coords) of a region's first rectangle shape, or null. */
+export function regionCenter(region) {
+  const s = region?.shapes?.[0];
+  if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.width)) return null;
+  return { x: s.x + s.width / 2, y: s.y + s.height / 2 };
+}
+
 /**
  * Build the RegionDocument source for one portal end. Bound to a single level
  * (each end can sit on a different floor at a different spot); elevation is set

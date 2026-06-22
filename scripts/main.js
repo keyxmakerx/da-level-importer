@@ -2,6 +2,7 @@ import { DAImporterDialog } from "./importer-dialog.js";
 import { DARegionAdderDialog } from "./region-adder-dialog.js";
 import { startAddStairs, startLinkRegions } from "./portal/portal-wizard.js";
 import { DAStairsManager } from "./portal/portal-manager.js";
+import { registerPortalOverlayHooks } from "./portal/portal-overlay.js";
 import { MODULE_ID, SETTING_IMPORTER_DEFAULTS } from "./constants.js";
 
 Hooks.once("init", () => {
@@ -25,6 +26,9 @@ Hooks.once("init", () => {
     // Legacy: the original single-region changeLevel tool (kept available, no button).
     AddRegion: () => new DARegionAdderDialog().render(true)
   };
+
+  // GM-only translucent link overlay for same-level portal pairs + portal markers.
+  registerPortalOverlayHooks();
 });
 
 Hooks.once("ready", () => {
