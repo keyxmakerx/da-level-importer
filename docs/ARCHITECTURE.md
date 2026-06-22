@@ -1,7 +1,9 @@
-# DA Level Importer — Architecture
+# Dungeon Alchemist Toolkit — Architecture
 
-Developer documentation for the **Dungeon Alchemist Level Importer** Foundry VTT module
-(`module.json:2` → id `da-level-importer`, version `0.0.6`, compatibility minimum/verified `14`,
+> Provisional — being updated for the v0.1.0 relaunch.
+
+Developer documentation for the **Dungeon Alchemist Toolkit** Foundry VTT module
+(`module.json:2` → id `dungeon-alchemist-toolkit`, version `0.1.0`, compatibility minimum/verified `14`,
 authored by *Mestre Digital*; `module.json:6-9`, `module.json:11-17`).
 
 The module imports a multi-floor Dungeon Alchemist export — one background media file
@@ -9,7 +11,7 @@ The module imports a multi-floor Dungeon Alchemist export — one background med
 **native v14 Scene Levels**, with walls/doors/lights bound to each level. It also ships a region
 tool that creates multi-level staircase/elevator transit regions.
 
-> All references below are `file:line` into the real source as of v0.0.6. Where behavior is
+> All references below are `file:line` into the real source as of v0.1.0. Where behavior is
 > inferred or relies on undocumented Foundry internals, this is called out explicitly.
 
 ---
@@ -77,8 +79,8 @@ On `init`, the module does two things:
   - `Importer()` — constructs and renders a `DAImporterDialog` (`scripts/importer-dialog.js:42`).
   - `AddRegion()` — constructs and renders a `DARegionAdderDialog` (`scripts/region-adder-dialog.js:19`).
 
-`MODULE_ID` is the shared constant `"da-level-importer"` (`scripts/constants.js:2`), kept in sync
-with `module.json:2`.
+`MODULE_ID` is the shared constant `"dungeon-alchemist-toolkit"` (`scripts/constants.js:2`), kept in
+sync with `module.json:2`.
 
 ### `ready` hook — expose the `DA` global (`scripts/main.js:21-23`)
 
@@ -90,8 +92,8 @@ Hooks.once("ready", () => {
 
 This makes the same API reachable from the browser console or any macro as `DA.Importer()` /
 `DA.AddRegion()`. The canonical, namespaced access path remains
-`game.modules.get("da-level-importer").api.{Importer,AddRegion}()`; `DA` is a convenience alias bound
-to the identical object.
+`game.modules.get("dungeon-alchemist-toolkit").api.{Importer,AddRegion}()`; `DA` is a convenience
+alias bound to the identical object.
 
 ### Scenes-directory sidebar button injection (`scripts/main.js:32-49`)
 
@@ -351,7 +353,9 @@ floor's JSON** (`first = floors[0].data`, `scripts/da-importer.js:219`):
   `scripts/da-importer.js:279-281`).
 - `grid`: `type: 1` (square), `size: first.grid`, plus color/alpha/distance/units pulled from
   `first` with fallbacks (`scripts/da-importer.js:283-292`); `alpha` is the dialog's `gridAlpha`.
-- `tokenVision: true`, `fog.mode: 1` (`scripts/da-importer.js:293-294`).
+- `tokenVision: true`; **fog is omitted** so the Scene inherits the v14 default — v14 replaced the
+  numeric `fog.mode` with `fog.exploration` modes, so emitting `mode` would fail validation
+  (`scripts/da-importer.js`).
 - `environment` block (`scripts/da-importer.js:295-307`): `darknessLevel`, a `globalLight` whose
   `enabled` mirrors `!!first.globalLight`, plus static `base`/`dark` color grading.
 - `levels` (from Stage 5), `initialLevel`, `walls`, `lights` (`scripts/da-importer.js:308-311`).

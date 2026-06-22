@@ -1,3 +1,24 @@
+# 0.1.0
+
+## [Changed]
+- **Relaunched as Dungeon Alchemist Toolkit** (new module id `dungeon-alchemist-toolkit`). The module's focus is now narrow: import a Dungeon Alchemist folder into a single Foundry v14 Scene built on native Scene Levels, plus the multi-level stairs/elevator region tool.
+
+## [Removed]
+- The standalone **"DA Edit Levels"** edit-mode (`DA.EditLevels()`) and the per-floor **Visible Levels** dropdown. Per-level naming, elevation, roof, start, and cross-level visibility editing is now deferred to **Foundry v14's native Levels tab in Scene Config** after import.
+
+## [Fixed]
+- **Hardened the v14 import** so a single malformed entry can no longer abort the whole import:
+  - Dropped the invalid Scene `fog.mode` value (v14 replaced the numeric `fog.mode` with `fog.exploration` modes); the Scene now inherits the v14 fog default.
+  - Walls with a malformed `c` (not four finite numbers) and lights with a non-finite `x`/`y` are now skipped individually instead of failing `Scene.create` and losing every floor.
+  - Dropped the Region `visibility` magic integer (`2`) — it no longer matches v14's reworked Region visibility enum; the region inherits the v14 default.
+- Wrapped `Scene.create` in a try/catch safeguard so a validation error reports a notification and aborts cleanly instead of throwing.
+
+## [Kept]
+- The DA-aware import conveniences: per-floor names pre-filled from the original filename, auto-stacked floor elevations, the roof shortcut (a floor whose filename contains "roof" is pre-marked, rendering only over the floor below), and the image/video media preview.
+
+## [Credits]
+- GPLv3 fork attribution to **Bruno Calado (Mestre Digital)** — *Dungeon Alchemist Toolkit* is an independent fork that substantially expands the original `da-level-importer`.
+
 # 0.0.14
 
 ## [Added]
