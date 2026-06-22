@@ -49,16 +49,14 @@ copy it across. Or skip it — the only cost is the dialog defaults resetting on
 - GPLv3 explicitly permits the fork/rename/redistribution; the only obligations are *keep it
   GPLv3* and *preserve attribution*. Both honored.
 
-## 6. Name — decision pending (yours to choose)
+## 6. Name — DECIDED ✅
 
-Centered on the moat (DA→Foundry import). Starting candidates (title / machine id):
-- **Dungeon Alchemist Importer** / `dungeon-alchemist-importer`
-- **Alchemist Forge** / `alchemist-forge`
-- **DA Scene Bridge** / `da-scene-bridge`
-- **Dungeon Alchemist Toolkit** / `dungeon-alchemist-toolkit` (if we lean "suite")
+- **Title:** Dungeon Alchemist Toolkit
+- **Module id:** `dungeon-alchemist-toolkit`
+- **Target repo:** `keyxmakerx/dungeon-alchemist-toolkit` (rename the GitHub repo to match).
 
-Pick one or supply your own; the machine id just needs to be lowercase-hyphenated and unique
-(not `da-level-importer`).
+Positions the project as a *suite* — import automation + native-built stairs/portals +
+DA-aware conveniences — per the strategy.
 
 ## 7. Sequencing — bundle as a clean **v0.1.0** relaunch
 
