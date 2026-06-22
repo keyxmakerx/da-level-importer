@@ -1,3 +1,8 @@
+# 0.0.14
+
+## [Added]
+- **Edit an existing scene's levels** — `DA.EditLevels()` and a new **"DA Edit Levels"** sidebar button. Open it on a scene you're viewing to rename levels, change their bottom/top elevations, reorder them (drag the **#**), and adjust Roof / Start / Visible, then **Apply Changes**. Edits are written in place by level id, so all walls, lights, and regions stay bound — no re-linking. *(v1 edits the existing levels; adding/removing levels is not yet supported. Reordering restacks elevations to the default ladder.)*
+
 # 0.0.13
 
 ## [Fixed]
