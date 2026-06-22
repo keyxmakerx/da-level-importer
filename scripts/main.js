@@ -1,5 +1,6 @@
 import { DAImporterDialog } from "./importer-dialog.js";
 import { DARegionAdderDialog } from "./region-adder-dialog.js";
+import { startAddStairs, startLinkRegions } from "./portal/portal-wizard.js";
 import { MODULE_ID, SETTING_IMPORTER_DEFAULTS } from "./constants.js";
 
 Hooks.once("init", () => {
@@ -14,6 +15,11 @@ Hooks.once("init", () => {
 
   game.modules.get(MODULE_ID).api = {
     Importer: () => new DAImporterDialog().render(true),
+    // New native-teleport stairs/portal flow (place entrance -> switch level -> place exit).
+    AddStairs: (opts) => startAddStairs(canvas?.scene, opts),
+    // Link two already-selected Regions into a teleport pair.
+    LinkStairs: (opts) => startLinkRegions(canvas?.scene, opts),
+    // Legacy: the original single-region changeLevel tool (kept available, no button).
     AddRegion: () => new DARegionAdderDialog().render(true)
   };
 });
@@ -43,17 +49,17 @@ Hooks.on("renderSceneDirectory", (_app, html) => {
   importBtn.innerHTML = '<i class="fas fa-file-import"></i> DA Level Importer';
   importBtn.addEventListener("click", () => api.Importer());
 
-  const regionBtn = document.createElement("button");
-  regionBtn.type = "button";
-  regionBtn.className = "da-region-sidebar-btn";
-  regionBtn.innerHTML = '<i class="fas fa-stairs"></i> DA Add Stairs / Elevator';
-  regionBtn.dataset.tooltip = "Place a multi-level stair/elevator region on the scene you're viewing";
-  regionBtn.addEventListener("click", () => api.AddRegion());
+  const stairsBtn = document.createElement("button");
+  stairsBtn.type = "button";
+  stairsBtn.className = "da-region-sidebar-btn";
+  stairsBtn.innerHTML = '<i class="fas fa-stairs"></i> DA Add Stairs / Portal';
+  stairsBtn.dataset.tooltip = "Place an entrance, switch level, place an exit — linked as a native teleport (stairs, elevator, or same-map teleport)";
+  stairsBtn.addEventListener("click", () => api.AddStairs());
 
   // Insert after the native action buttons (Create Scene / Create Folder) so the
   // buttons sit between those and the search bar, regardless of v14's markup.
   const actionButtons = header.querySelector(".action-buttons") ?? header.querySelector(".header-actions");
   const anchor = actionButtons ? actionButtons.nextSibling : null;
   header.insertBefore(importBtn, anchor);
-  header.insertBefore(regionBtn, anchor);
+  header.insertBefore(stairsBtn, anchor);
 });

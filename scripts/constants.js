@@ -18,3 +18,11 @@ export const SETTING_IMPORTER_DEFAULTS = "importerDefaults";
  * Foundry recommends keeping animated maps under ~50 MB.
  */
 export const MEDIA_SIZE_WARN_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Flag key (under MODULE_ID) stamped on a Region that participates in a
+ * stair/portal link: `{ linkId, label, mode, role }`. Lets the Stairs Manager
+ * and the GM link overlay find and group linked portals without re-deriving
+ * them from the native teleportToken destinations.
+ */
+export const PORTAL_FLAG = "portal";
