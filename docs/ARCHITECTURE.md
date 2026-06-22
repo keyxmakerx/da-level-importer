@@ -169,7 +169,7 @@ flowchart TD
   COPY -->|no| LV
   CP --> LV["Build levels[] (one per floor)<br/>da-importer.js:222-249"]
 
-  LV --> VIS["Compute visibility.levels per level<br/>(isRoof + visibleLevels, deduped)<br/>da-importer.js:254-263"]
+  LV --> VIS["Compute visibility.levels per level<br/>(isRoof shortcut only)<br/>da-importer.js:254-259"]
   VIS --> WL["Map walls + lights per floor<br/>_mapWall / _mapLight<br/>da-importer.js:267-274"]
   WL --> SD["Assemble sceneData<br/>(grid, env, levels, initialLevel, walls, lights)<br/>da-importer.js:277-312"]
   SD --> SC["Scene.create(sceneData)<br/>da-importer.js:318"]
@@ -319,16 +319,14 @@ One Scene Level per floor. For floor `i`:
 
 The complete emitted Level shape is documented in [§3](#scene-level-object).
 
-#### `visibility.levels` second pass (`scripts/da-importer.js:254-263`)
+#### `visibility.levels` second pass (`scripts/da-importer.js:254-259`)
 
-After all levels exist (so their `_id`s are known), `visibility.levels` is computed per level by
-**merging two sources, deduplicated**:
-
-- **`isRoof` shortcut**: if `i > 0` and the override marks this level a roof, push the
-  *immediately-lower* level's id (`scripts/da-importer.js:257`). Per the toggle's tooltip, a roof
-  renders only when the floor directly below it is active (`scripts/importer-dialog.js:463`).
-- **Explicit `visibleLevels`**: for each selected index `j`, push `levels[j]._id` if present and
-  not already included (`scripts/da-importer.js:258-260`).
+After all levels exist (so their `_id`s are known), `visibility.levels` is computed per level from a
+single source — the **`isRoof` shortcut**: if `i > 0` and the override marks this level a roof, push
+the *immediately-lower* level's id (`scripts/da-importer.js:257`), so a roof renders only when the
+floor directly below it is active. Any finer cross-level visibility is now configured natively via
+the **v14 Levels tab in Scene Config** after import — the importer no longer ships a Visible-Levels
+dropdown.
 
 ### Stage 6 — Map walls & lights (`scripts/da-importer.js:267-274`)
 
@@ -561,7 +559,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   (`:77-81`).
 
 **`PARTS`** (`scripts/importer-dialog.js:84-88`): a single `form` part →
-`modules/da-level-importer/templates/importer.hbs`.
+`modules/dungeon-alchemist-toolkit/templates/importer.hbs`.
 
 <a name="persisted-dialog-defaults"></a>
 ### Persisted dialog defaults (`game.settings`)
@@ -989,8 +987,8 @@ sequenceDiagram
   (`scripts/importer-dialog.js:77-81` or `scripts/region-adder-dialog.js:35-37`) and a matching
   `data-action="..."` element in the template.
 - **Module identity.** `MODULE_ID` (`scripts/constants.js:2`) must match `module.json:2`; the
-  template paths in `PARTS` are hard-coded to `modules/da-level-importer/...`
-  (`scripts/importer-dialog.js:86`, `scripts/region-adder-dialog.js:42`) and would need updating if
+  template paths in `PARTS` are hard-coded to `modules/dungeon-alchemist-toolkit/...`
+  (`scripts/importer-dialog.js:87`, `scripts/region-adder-dialog.js:42`) and would need updating if
   the id changes.
 
 ---
