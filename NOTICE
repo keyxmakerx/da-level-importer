@@ -1,0 +1,15 @@
+Dungeon Alchemist Toolkit
+Copyright (C) 2026 keyxmakerx and contributors
+
+This program is free software licensed under the GNU General Public License v3.0.
+See LICENSE for the full text.
+
+This project is an independent fork of, and based upon:
+  da-level-importer — https://github.com/brunocalado/da-level-importer
+  Copyright (C) Bruno Calado (Mestre Digital), licensed under GPL-3.0.
+
+Substantial additional work (Foundry v14 native-Levels import hardening,
+level/stairs tooling, and ongoing development) by keyxmakerx and contributors.
+
+"Dungeon Alchemist" is a product of Briganti; map assets are subject to the
+Dungeon Alchemist Terms of Use — https://www.dungeonalchemist.com/terms-of-use

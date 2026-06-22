@@ -1,4 +1,4 @@
-# Dungeon Alchemist Level Importer
+# Dungeon Alchemist Toolkit
 
 Foundry VTT v14 module that imports a Dungeon Alchemist multi-level export and creates a Scene using native v14 Scene Levels.
 
@@ -70,12 +70,14 @@ Install via the Foundry VTT Module browser or use this manifest link.
 > **Testing build:** this manifest currently points to the `claude/festive-newton-i8l7nk` branch so the in-progress features can be tested before release. It will be repointed to `main` once that work is merged.
 
 ```javascript
-https://raw.githubusercontent.com/keyxmakerx/da-level-importer/refs/heads/claude/festive-newton-i8l7nk/module.json
+https://raw.githubusercontent.com/keyxmakerx/dungeon-alchemist-toolkit/refs/heads/claude/festive-newton-i8l7nk/module.json
 ```
 
 # ⚖️ Credits & License
 
 * **Code License:** GNU GPLv3.
+
+* **Based on** [da-level-importer](https://github.com/brunocalado/da-level-importer) by **Bruno Calado (Mestre Digital)**, used and extended under GPLv3. *Dungeon Alchemist Toolkit* is an independent fork that substantially expands the original — see NOTICE.
 
 * **Demo:** The maps are from Dungeon Alchemist and are under their license: https://www.dungeonalchemist.com/terms-of-use
 

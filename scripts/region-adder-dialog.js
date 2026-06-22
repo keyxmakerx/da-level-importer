@@ -13,7 +13,7 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
  *   2. choosing how many levels above / below should also receive the region
  *   3. clicking on the canvas to place a multi-level transit region
  *
- * Triggered programmatically via the module API (`game.modules.get("da-level-importer").api.AddRegion()`)
+ * Triggered programmatically via the module API (`game.modules.get("dungeon-alchemist-toolkit").api.AddRegion()`)
  * or globally as `DA.AddRegion()`. Lifecycle: `_prepareContext` → `_onRender`.
  */
 export class DARegionAdderDialog extends HandlebarsApplicationMixin(ApplicationV2) {
@@ -39,7 +39,7 @@ export class DARegionAdderDialog extends HandlebarsApplicationMixin(ApplicationV
 
   static PARTS = {
     form: {
-      template: "modules/da-level-importer/templates/region-adder.hbs"
+      template: "modules/dungeon-alchemist-toolkit/templates/region-adder.hbs"
     }
   };
 

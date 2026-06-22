@@ -1,5 +1,5 @@
 /** The module's unique identifier — matches the `id` field in module.json. */
-export const MODULE_ID = "da-level-importer";
+export const MODULE_ID = "dungeon-alchemist-toolkit";
 
 /**
  * Default elevation span per floor, in Foundry level units.
