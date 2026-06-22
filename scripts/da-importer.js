@@ -269,8 +269,16 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
     // Stamp lights at the level's resolved bottom (which honors per-level
     // overrides), not a recomputed i * FLOOR_HEIGHT that ignores them.
     const elevation = levels[i].elevation.bottom;
-    for (const w of (f.data.walls ?? [])) walls.push(_mapWall(w, levelId, doorTexture, doorSound));
-    for (const l of (f.data.lights ?? [])) lights.push(_mapLight(l, levelId, elevation));
+    // _mapWall/_mapLight return null for malformed DA data; skip nulls so one bad
+    // wall or light can't fail the entire Scene.create and lose every floor.
+    for (const w of (f.data.walls ?? [])) {
+      const wall = _mapWall(w, levelId, doorTexture, doorSound);
+      if (wall) walls.push(wall);
+    }
+    for (const l of (f.data.lights ?? [])) {
+      const light = _mapLight(l, levelId, elevation);
+      if (light) lights.push(light);
+    }
   });
   console.log(`[DA Importer] built ${levels.length} levels, ${walls.length} walls, ${lights.length} lights`);
 
@@ -291,7 +299,9 @@ export async function importFolder({ source, path, backgroundColor = "#000000", 
       units: first.gridUnits ?? "ft"
     },
     tokenVision: true,
-    fog: { mode: 1, colors: { explored: null, unexplored: null } },
+    // Fog omitted — inherit the v14 default. v14 replaced the old numeric `fog.mode`
+    // with `fog.exploration` modes (Disabled/Individual/Shared), so emitting `mode`
+    // is not a valid v14 field and can fail Scene.create validation.
     environment: {
       darknessLevel: first.darkness ?? 0,
       darknessLock: false,
@@ -456,6 +466,9 @@ function _moveEnum(v) {
  * @returns {object}
  */
 function _mapWall(daWall, levelId, doorTexture = "", doorSound = "") {
+  // Skip malformed walls: `c` must be four finite numbers, or v14's WallDocument
+  // schema rejects the payload and aborts the whole Scene.create (losing every floor).
+  if (!Array.isArray(daWall?.c) || daWall.c.length !== 4 || !daWall.c.every(Number.isFinite)) return null;
   const wallDoc = {
     c: daWall.c,
     move:  _moveEnum(daWall.move ?? 1),
@@ -483,6 +496,8 @@ function _mapWall(daWall, levelId, doorTexture = "", doorSound = "") {
  * @returns {object}
  */
 function _mapLight(daLight, levelId, elevation) {
+  // Skip malformed lights: x/y must be finite, or v14's schema aborts the import.
+  if (!Number.isFinite(daLight?.x) || !Number.isFinite(daLight?.y)) return null;
   return {
     x: daLight.x,
     y: daLight.y,
@@ -491,8 +506,8 @@ function _mapLight(daLight, levelId, elevation) {
     vision: false,
     elevation,
     config: {
-      dim: daLight.dim,
-      bright: daLight.bright,
+      dim: Number.isFinite(daLight.dim) ? daLight.dim : 0,
+      bright: Number.isFinite(daLight.bright) ? daLight.bright : 0,
       color: daLight.tintColor ?? null,
       alpha: daLight.tintAlpha ?? 0.5,
       angle: 360,

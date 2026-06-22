@@ -256,7 +256,8 @@ export async function createMultiLevelRegion({ scene, x, y, width, height, level
     color: "#b0cc28",
     elevation: { bottom: minBottom, top: maxTop },
     levels: levelIds,
-    visibility: 2,
+    // visibility omitted — inherit the v14 default (LAYER_UNLOCKED). The old literal `2`
+    // is a magic int against v14's reworked Region visibility enum and may misbehave.
     highlightMode: "shapes",
     displayMeasurements: false,
     hidden: false,
