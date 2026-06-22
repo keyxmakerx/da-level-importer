@@ -1,4 +1,5 @@
 import { importFolder, collectFloorPairs, isVideoPath } from "./da-importer.js";
+import { getSceneLevels } from "./region-adder.js";
 import { FLOOR_HEIGHT, MODULE_ID, SETTING_IMPORTER_DEFAULTS, MEDIA_SIZE_WARN_BYTES } from "./constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -50,16 +51,42 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   _thumbVideos = [];
   /** The single active document-level "click outside to close" handler for the Visible Levels dropdowns. */
   _visOutsideHandler = null;
-  /** Zero-based index of the level shown on scene load. Defaults to the first level. */
-  _initialLevelIndex = 0;
+  /** Stable id (uid) of the level shown on scene load; null until a folder is browsed. */
+  _initialLevelUid = null;
+  /** @type {Map<string, {name:string,bottom:string,top:string,isRoof:boolean,visible:Set<string>}>} Per-floor editable state keyed by uid, so edits survive row rebuilds and reordering. */
+  _levelState = new Map();
+  /** Source row index during an in-progress drag-to-reorder; null when not dragging. */
+  _dragFromIndex = null;
   /** Guards one-time restore of persisted dialog selections (applied on first render). */
   _restoredDefaults = false;
-  /** @type {Map<number, number>} Probed media sizes (bytes) keyed by floor index; re-applied to rows on render. */
+  /** @type {Map<string, number>} Probed media sizes (bytes) keyed by floor uid; re-applied to rows on render. */
   _mediaSizes = new Map();
   /** Monotonic token so a stale size-probe batch can't patch rows after a newer browse. */
   _sizeProbeGen = 0;
   /** AbortController for the in-flight size-probe batch (aborted on re-browse / close). */
   _sizeAbort = null;
+  /** Levels-tab "Show advanced columns" state (Roof / Start / Visible); persisted across re-renders. */
+  _advancedView = false;
+  /** "create" (import a folder into a new scene) or "edit" (edit an existing scene's levels). */
+  _mode = "create";
+  /** The scene being edited in edit-mode (the scene currently on the canvas). */
+  _editScene = null;
+  /** Guards one-time hydration of edit-mode rows from the scene's levels. */
+  _editHydrated = false;
+
+  /**
+   * @param {object} [options]
+   * @param {"create"|"edit"} [options.mode]  Dialog mode; defaults to "create".
+   * @param {Scene} [options.scene]           Scene to edit (edit-mode only).
+   */
+  constructor(options = {}) {
+    super(options);
+    if (options.mode === "edit") {
+      this._mode = "edit";
+      this._editScene = options.scene ?? null;
+    }
+  }
+
   static DEFAULT_OPTIONS = {
     id: "da-importer",
     tag: "form",
@@ -87,6 +114,99 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     }
   };
 
+  /** @override — window title reflects the mode. */
+  get title() {
+    return this._mode === "edit" ? "Edit Scene Levels" : "Dungeon Alchemist Level Importer";
+  }
+
+  /**
+   * Edit-mode only: hydrate the Levels-tab rows from the target scene's existing
+   * `Level` documents (keyed by their real `_id`, sorted bottom-up). Runs once.
+   * Each row reuses the create-mode machinery: `uid` = the level `_id`, the
+   * thumbnail = the level background, and `_levelState` is seeded from the level's
+   * name / elevation / visibility. `initialLevelUid` = the scene's `initialLevel`.
+   */
+  _hydrateEditScene() {
+    if (this._editHydrated || this._mode !== "edit" || !this._editScene) return;
+    this._editHydrated = true;
+
+    const levels = getSceneLevels(this._editScene); // sorted by elevation.bottom
+    this._floorPairs = levels.map((lvl, i) => ({
+      uid: lvl._id,
+      levelId: lvl._id,
+      stem: lvl.name || `Floor ${i}`,
+      media: lvl.background?.src ?? "",
+      json: null
+    }));
+    this._levelState = new Map();
+    for (const lvl of levels) {
+      this._levelState.set(lvl._id, {
+        name:   lvl.name ?? "",
+        bottom: String(lvl.elevation?.bottom ?? 0),
+        top:    String(lvl.elevation?.top ?? 0),
+        // The raw visible set round-trips; we don't reverse-engineer the roof shortcut.
+        isRoof: false,
+        visible: new Set(lvl.visibility?.levels ?? [])
+      });
+    }
+    this._initialLevelUid = this._editScene.initialLevel ?? this._floorPairs[0]?.uid ?? null;
+  }
+
+  /**
+   * Edit-mode only: write the Levels-tab edits back to the existing scene. Updates
+   * each `Level` in place by `_id` (rename / re-elevate / reorder via `sort` /
+   * visibility), which keeps every wall/light/region `levels` binding valid with
+   * no re-binding. v1 does not add or delete levels.
+   */
+  async _applyLevelEdits() {
+    const scene = this._editScene;
+    if (!scene) { ui.notifications.error("DA: no scene to edit."); return; }
+    this._captureRowState();
+
+    const bad = [];
+    this._floorPairs.forEach((pair, i) => {
+      const st = this._levelState.get(pair.uid);
+      const b = parseInt(st?.bottom ?? "", 10);
+      const t = parseInt(st?.top ?? "", 10);
+      if (Number.isFinite(b) && Number.isFinite(t) && b >= t) bad.push(i);
+    });
+    if (bad.length) {
+      ui.notifications.error(`DA: level(s) ${bad.join(", ")} have bottom ≥ top. Fix the elevation values.`);
+      return;
+    }
+
+    const updates = this._floorPairs.map((pair, i) => {
+      const st = this._levelState.get(pair.uid) ?? {};
+      const visible = new Set(st.visible ?? []);
+      if (i > 0 && st.isRoof) visible.add(this._floorPairs[i - 1].uid); // roof shortcut -> show floor below
+      visible.delete(pair.uid); // never include self
+      const update = {
+        _id: pair.uid,
+        name: (st.name ?? "").trim() || `Floor ${i}`,
+        sort: i,
+        "visibility.levels": [...visible]
+      };
+      // Only write finite elevations; a blank field keeps the level's current value.
+      const b = parseInt(st.bottom, 10);
+      const t = parseInt(st.top, 10);
+      if (Number.isFinite(b)) update["elevation.bottom"] = b;
+      if (Number.isFinite(t)) update["elevation.top"] = t;
+      return update;
+    });
+
+    try {
+      await scene.updateEmbeddedDocuments("Level", updates);
+      if (this._initialLevelUid && this._initialLevelUid !== scene.initialLevel) {
+        await scene.update({ initialLevel: this._initialLevelUid });
+      }
+      ui.notifications.info(`DA: updated ${updates.length} level(s) on "${scene.name}".`);
+      this.close();
+    } catch (err) {
+      ui.notifications.error(`DA: failed to update levels (${err.message})`);
+      console.error(err);
+    }
+  }
+
   static async #onBrowse(_event, _target) {
     const FilePicker = foundry.applications.apps.FilePicker.implementation;
     const picker = new FilePicker({
@@ -106,10 +226,18 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         } catch (_err) {
           this._floorPairs = [];
         }
-        // Re-selecting a folder with fewer floors must not leave the initial-level
-        // index pointing past the end (the star would then highlight no row).
-        this._initialLevelIndex = Math.min(this._initialLevelIndex, Math.max(0, this._floorPairs.length - 1));
+        // Fresh folder: give each floor a stable uid (so its edits and order can
+        // follow it), and reset per-floor state, the initial level, and sizes.
+        for (const p of this._floorPairs) p.uid = foundry.utils.randomID();
+        this._levelState = new Map();
+        this._initialLevelUid = this._floorPairs[0]?.uid ?? null;
         this._mediaSizes = new Map();
+        // Heuristic: a floor whose filename contains "roof" is pre-marked as a Roof
+        // (a default only — overridable under "Show advanced columns").
+        const roofs = this._floorPairs.filter(p => /\broof/i.test(p.stem));
+        if (roofs.length) {
+          ui.notifications.info(`DA Importer: detected ${roofs.length} roof layer(s) and pre-marked them as Roof — ${roofs.map(p => p.stem).join(", ")}. Use "Show advanced columns" to review.`);
+        }
         this._populateLevelsTab();
         this._probeMediaSizes(source);
       }
@@ -182,9 +310,12 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * @override
    */
   _onRender(_context, _options) {
+    // Edit-mode: hydrate rows from the scene's existing levels (once) before anything else.
+    this._hydrateEditScene();
+
     // Restore persisted selections before wiring inputs, so the range display
-    // and door preview below reflect the restored values.
-    this._restoreSavedDefaults();
+    // and door preview below reflect the restored values (create-mode only).
+    if (this._mode !== "edit") this._restoreSavedDefaults();
 
     // Range slider display sync
     const range = this.element.querySelector("input[name='gridAlpha']");
@@ -248,14 +379,41 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     if (uniformInput) {
       uniformInput.addEventListener("change", () => {
         const h = parseInt(uniformInput.value, 10);
-        if (!Number.isFinite(h) || h < 1) return;
-        this._floorPairs.forEach((_, i) => {
-          const bInput = this.element.querySelector(`input[name="levelBottom[${i}]"]`);
-          const tInput = this.element.querySelector(`input[name="levelTop[${i}]"]`);
-          if (bInput) bInput.value = String(i === 0 ? 0 : i * h + 1);
-          if (tInput) tInput.value = String((i + 1) * h);
-        });
+        if (!Number.isFinite(h) || h < 1 || !this._floorPairs.length) return;
+        // Preserve names/roof/visible; restack all elevations to the new height.
+        this._captureRowState();
+        this._recomputeElevations();
+        this._populateLevelsTab();
       });
+    }
+
+    // Basic / Advanced columns toggle for the Levels tab. The advanced cells stay
+    // in the DOM when hidden (CSS display:none), so import still reads them.
+    const advToggle = this.element.querySelector("input[name='showAdvanced']");
+    const levelsList = this.element.querySelector(".da-levels-list");
+    if (advToggle && levelsList) {
+      advToggle.checked = this._advancedView;
+      levelsList.classList.toggle("da-levels--advanced", this._advancedView);
+      advToggle.addEventListener("change", () => {
+        this._advancedView = advToggle.checked;
+        levelsList.classList.toggle("da-levels--advanced", this._advancedView);
+      });
+    }
+
+    // Info (ⓘ) button — toggles a readable help panel explaining the advanced columns.
+    const advHelpBtn = this.element.querySelector(".da-info-icon");
+    const advHelp = this.element.querySelector(".da-adv-help");
+    if (advHelpBtn && advHelp) {
+      advHelpBtn.addEventListener("click", () => { advHelp.hidden = !advHelp.hidden; });
+    }
+
+    // Edit-mode UI: relabel the action button, hide the import-only controls
+    // (folder picker / Scene Defaults / Doors), and show the Levels tab.
+    if (this._mode === "edit") {
+      this.element.classList.add("da-mode-edit");
+      const importBtn = this.element.querySelector("[data-action='import']");
+      if (importBtn) importBtn.innerHTML = '<i class="fas fa-floppy-disk"></i> Apply Changes';
+      this.element.querySelector(".da-tab-btn[data-tab='levels']")?.click();
     }
 
     // Restore levels tab rows after any re-render.
@@ -292,6 +450,12 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       try { v.pause(); v.removeAttribute("src"); v.load(); } catch (_) { /* ignore */ }
     }
     this._thumbVideos = [];
+    // Also clear any enlarged hover tooltip orphaned on document.body by a rebuild
+    // that happened while the pointer was still over a thumbnail.
+    document.querySelectorAll(".da-level-tooltip").forEach((t) => {
+      t.querySelector("video")?.pause();
+      t.remove();
+    });
   }
 
   /**
@@ -326,16 +490,16 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         const bytes = len ? parseInt(len, 10) : NaN;
         if (!Number.isFinite(bytes)) return;
         if (gen !== this._sizeProbeGen) return; // superseded by a newer browse
-        this._mediaSizes.set(i, bytes);
-        this._applySizeBadge(i, bytes);
-        if (bytes >= MEDIA_SIZE_WARN_BYTES) oversize.push(i);
+        this._mediaSizes.set(pair.uid, bytes);
+        this._applySizeBadge(pair, bytes);
+        if (bytes >= MEDIA_SIZE_WARN_BYTES) oversize.push(pair.stem);
       } catch (_) { /* unknown size — no warning */ }
     }));
     clearTimeout(timer);
 
     if (gen === this._sizeProbeGen && oversize.length) {
-      const list = oversize.sort((a, b) => a - b).join(", ");
-      ui.notifications.warn(`DA Importer: ${oversize.length} floor(s) exceed ~50 MB (floor ${list}). Large videos slow scene loads; consider importing referenced-in-place (Copy Media off).`);
+      // Report by filename, not index — a reorder during the probe would stale indices.
+      ui.notifications.warn(`DA Importer: ${oversize.length} floor(s) exceed ~50 MB (${oversize.join(", ")}). Large videos slow scene loads; consider importing referenced-in-place (Copy Media off).`);
     }
   }
 
@@ -345,21 +509,82 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * channels (no innerHTML). Accepts an optional `thumbEl` for the build-time
    * call (the row isn't in the DOM yet); otherwise looks the thumb up by index.
    *
-   * @param {number} i
+   * @param {{uid:string,stem:string}} pair
    * @param {number} bytes
    * @param {HTMLElement} [thumbEl]
    */
-  _applySizeBadge(i, bytes, thumbEl) {
-    const thumb = thumbEl ?? this.element?.querySelector(`.da-level-row[data-level-index="${i}"] .da-level-thumb`);
+  _applySizeBadge(pair, bytes, thumbEl) {
+    const thumb = thumbEl ?? this.element?.querySelector(`.da-level-row[data-uid="${pair.uid}"] .da-level-thumb`);
     if (!thumb) return;
     const mb = (bytes / (1024 * 1024)).toFixed(1);
     if (bytes >= MEDIA_SIZE_WARN_BYTES) {
       thumb.classList.add("da-thumb-oversize");
-      thumb.title = `${mb} MB — exceeds Foundry's ~50 MB recommendation for animated maps`;
+      thumb.dataset.tooltip = `${pair.stem} — ${mb} MB (exceeds Foundry's ~50 MB recommendation)`;
     } else {
       thumb.classList.remove("da-thumb-oversize");
-      thumb.title = `${mb} MB`;
+      thumb.dataset.tooltip = `${pair.stem} — ${mb} MB`;
     }
+  }
+
+  /**
+   * Snapshot the current Levels-tab edits (name, bottom, top, roof, and the set
+   * of visible levels — by uid) into this._levelState, keyed by each floor's
+   * stable uid, so values follow their floor rather than the row position. Run
+   * before any rebuild that must preserve edits (reorder, floor-height change).
+   */
+  _captureRowState() {
+    if (!this.element) return;
+    for (let i = 0; i < this._floorPairs.length; i++) {
+      const uid = this._floorPairs[i].uid;
+      const visible = new Set();
+      for (let j = 0; j < this._floorPairs.length; j++) {
+        if (j === i) continue;
+        if (this._visCheckboxes.get(`${i},${j}`)?.checked) visible.add(this._floorPairs[j].uid);
+      }
+      this._levelState.set(uid, {
+        name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value ?? "",
+        bottom: this.element.querySelector(`input[name="levelBottom[${i}]"]`)?.value ?? "",
+        top:    this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "",
+        isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false,
+        visible
+      });
+    }
+  }
+
+  /**
+   * Restack every floor's bottom/top in this._levelState to the default range for
+   * its current position, using the uniform Floor Height field. Names/roof/visible
+   * are left untouched. Used after a reorder or a floor-height change.
+   */
+  _recomputeElevations() {
+    const h = parseInt(this.element?.querySelector("input[name='uniformFloorHeight']")?.value ?? "", 10);
+    const height = Number.isFinite(h) && h >= 1 ? h : FLOOR_HEIGHT;
+    this._floorPairs.forEach((pair, i) => {
+      const st = this._levelState.get(pair.uid) ?? { name: pair.stem, isRoof: false, visible: new Set() };
+      st.bottom = String(i === 0 ? 0 : i * height + 1);
+      st.top = String((i + 1) * height);
+      if (i === 0) st.isRoof = false;   // a floor moved to the bottom can no longer be a roof
+      this._levelState.set(pair.uid, st);
+    });
+  }
+
+  /**
+   * Move a floor from index `from` to index `to` (drag-to-reorder): capture edits
+   * (so they follow each floor), reorder, restack elevations to the new order,
+   * then rebuild. Names, roof, start, and visible selections are preserved; only
+   * Bottom/Top recompute.
+   *
+   * @param {number} from
+   * @param {number} to
+   */
+  _reorderFloors(from, to) {
+    const n = this._floorPairs.length;
+    if (from === to || from < 0 || to < 0 || from >= n || to >= n) return;
+    this._captureRowState();
+    const [moved] = this._floorPairs.splice(from, 1);
+    this._floorPairs.splice(to, 0, moved);
+    this._recomputeElevations();
+    this._populateLevelsTab();
   }
 
   /**
@@ -380,6 +605,18 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const list = this.element?.querySelector(".da-levels-list");
     if (!list) return;
 
+    // Continuous capture: any edit to a row input snapshots straight into
+    // _levelState (wired once per list element), so edits survive a full
+    // ApplicationV2 re-render — which rebuilds rows from _levelState. The
+    // Visible-Levels checkboxes live in body-appended dropdowns (they don't
+    // bubble to the list), so they capture via their own change handler below.
+    if (!list.dataset.daCaptureWired) {
+      const capture = () => this._captureRowState();
+      list.addEventListener("input", capture);
+      list.addEventListener("change", capture);
+      list.dataset.daCaptureWired = "1";
+    }
+
     if (!this._floorPairs.length) {
       if (placeholder) placeholder.hidden = false;
       list.innerHTML = "";
@@ -392,9 +629,21 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     // Header row
     const header = document.createElement("div");
     header.className = "da-levels-header";
-    for (const label of ["#", "", "Name", "Bottom", "Top", "Roof", "Start", "Visible"]) {
+    const headerCols = [
+      { label: "#",       title: "Floor order (0 = bottom-most). Drag the number to reorder." },
+      { label: "",        title: "Map preview — hover for the original filename and size" },
+      { label: "Name",    title: "Level name — pre-filled from the original filename, editable" },
+      { label: "Bottom",  title: "Lower elevation of this floor, in grid units" },
+      { label: "Top",     title: "Upper elevation of this floor, in grid units" },
+      { label: "Roof",    title: "Show this level only when the floor directly below is active (ceilings/roofs)", adv: true },
+      { label: "Start",   title: "Which floor is shown when the scene first loads", adv: true },
+      { label: "Visible", title: "Which other floors stay visible while this one is active", adv: true }
+    ];
+    for (const col of headerCols) {
       const span = document.createElement("span");
-      span.textContent = label;
+      span.textContent = col.label;
+      span.dataset.tooltip = col.title;
+      if (col.adv) span.classList.add("da-adv-col");
       header.appendChild(span);
     }
     list.appendChild(header);
@@ -403,21 +652,48 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const rowData = [];
     for (let i = 0; i < this._floorPairs.length; i++) {
       const pair = this._floorPairs[i];
+      const st = this._levelState.get(pair.uid);
       const defaultBottom = i === 0 ? 0 : i * FLOOR_HEIGHT + 1;
       const defaultTop = (i + 1) * FLOOR_HEIGHT;
 
       const row = document.createElement("div");
       row.className = "da-level-row";
       row.dataset.levelIndex = String(i);
+      row.dataset.uid = pair.uid;
+      // Drag-to-reorder: the # cell is the handle; the whole row is a drop target.
+      row.addEventListener("dragover", (e) => {
+        if (this._dragFromIndex === null) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        row.classList.add("da-row-dragover");
+      });
+      row.addEventListener("dragleave", () => row.classList.remove("da-row-dragover"));
+      row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        row.classList.remove("da-row-dragover");
+        const from = this._dragFromIndex;
+        this._dragFromIndex = null;
+        if (from !== null && from !== i) this._reorderFloors(from, i);
+      });
 
       const indexBadge = document.createElement("span");
       indexBadge.className = "da-level-index";
       indexBadge.textContent = String(i);
+      indexBadge.draggable = true;
+      indexBadge.dataset.tooltip = "Drag to reorder this floor";
+      indexBadge.addEventListener("dragstart", (e) => {
+        this._dragFromIndex = i;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(i));
+        row.classList.add("da-row-dragging");
+      });
+      indexBadge.addEventListener("dragend", () => row.classList.remove("da-row-dragging"));
 
       const thumb = _buildThumbEl(pair.media, "da-level-thumb", { animate: false });
       if (thumb.tagName === "VIDEO") this._thumbVideos.push(thumb);
+      thumb.dataset.tooltip = pair.stem;   // original filename (size is appended once probed)
       // Re-apply a previously probed size badge (rows are rebuilt on every render).
-      if (this._mediaSizes.has(i)) this._applySizeBadge(i, this._mediaSizes.get(i), thumb);
+      if (this._mediaSizes.has(pair.uid)) this._applySizeBadge(pair, this._mediaSizes.get(pair.uid), thumb);
 
       // Hover tooltip — shows an enlarged, animated version of the level media
       let levelTooltip = null;
@@ -440,31 +716,35 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       const nameInput = document.createElement("input");
       nameInput.type = "text";
       nameInput.name = `levelName[${i}]`;
-      nameInput.value = `Floor ${i}`;
-      nameInput.placeholder = "Level name";
+      nameInput.value = st ? st.name : pair.stem;   // preserved edit, else the original filename
+      nameInput.placeholder = `Floor ${i}`;
 
       const bottomInput = document.createElement("input");
       bottomInput.type = "number";
       bottomInput.name = `levelBottom[${i}]`;
-      bottomInput.value = String(defaultBottom);
+      bottomInput.value = st ? st.bottom : String(defaultBottom);
       bottomInput.min = "0";
       bottomInput.step = "1";
 
       const topInput = document.createElement("input");
       topInput.type = "number";
       topInput.name = `levelTop[${i}]`;
-      topInput.value = String(defaultTop);
+      topInput.value = st ? st.top : String(defaultTop);
       topInput.min = "0";
       topInput.step = "1";
 
       // Roof toggle
       const roofLabel = document.createElement("label");
-      roofLabel.className = "da-toggle";
-      roofLabel.title = "When enabled, this level only renders when the level directly below it is active (roof behavior).";
+      roofLabel.className = "da-toggle da-adv-col";
+      roofLabel.dataset.tooltip = "Tick only if this floor is a roof/ceiling over the floor below; it then shows only when that lower floor is active. Most maps need this off.";
 
       const roofCheckbox = document.createElement("input");
       roofCheckbox.type = "checkbox";
       roofCheckbox.name = `levelIsRoof[${i}]`;
+      // The bottom floor (index 0) can't be a roof — it has no floor below to reveal.
+      roofCheckbox.disabled = i === 0;
+      // Preserve an explicit choice; otherwise pre-tick when the filename says "roof".
+      roofCheckbox.checked = i > 0 && (st ? !!st.isRoof : /\broof/i.test(pair.stem));
 
       const roofTrack = document.createElement("span");
       roofTrack.className = "da-toggle-track";
@@ -476,10 +756,10 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       // Initial level toggle — radio-style: only one row may be active at a time.
       const initBtn = document.createElement("button");
       initBtn.type = "button";
-      initBtn.className = "da-initial-btn";
-      initBtn.dataset.levelIndex = String(i);
-      initBtn.title = "Set as initial level (shown on scene load)";
-      const isInitial = i === this._initialLevelIndex;
+      initBtn.className = "da-initial-btn da-adv-col";
+      initBtn.dataset.uid = pair.uid;
+      initBtn.dataset.tooltip = "Set as initial level (shown on scene load)";
+      const isInitial = pair.uid === this._initialLevelUid;
       initBtn.textContent = isInitial ? "★" : "☆";
       if (isInitial) initBtn.classList.add("da-initial-btn--active");
 
@@ -492,10 +772,10 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     const allInitBtns = [...list.querySelectorAll(".da-initial-btn")];
     for (const btn of allInitBtns) {
       btn.addEventListener("click", () => {
-        const idx = parseInt(btn.dataset.levelIndex, 10);
-        this._initialLevelIndex = idx;
+        const uid = btn.dataset.uid;
+        this._initialLevelUid = uid;
         for (const b of allInitBtns) {
-          const active = parseInt(b.dataset.levelIndex, 10) === idx;
+          const active = b.dataset.uid === uid;
           b.textContent = active ? "★" : "☆";
           b.classList.toggle("da-initial-btn--active", active);
         }
@@ -507,9 +787,10 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
     // coordinates are always viewport-relative, bypassing Foundry's window transform.
     for (let i = 0; i < rowData.length; i++) {
       const { row } = rowData[i];
+      const stI = this._levelState.get(this._floorPairs[i].uid);
 
       const wrap = document.createElement("div");
-      wrap.className = "da-vis-wrap";
+      wrap.className = "da-vis-wrap da-adv-col";
 
       const btn = document.createElement("button");
       btn.type = "button";
@@ -529,6 +810,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         cb.type = "checkbox";
         cb.name = `levelVisibility[${i}][${j}]`;
         cb.dataset.levelIndex = String(j);
+        cb.checked = !!stI?.visible?.has(this._floorPairs[j].uid);
         this._visCheckboxes.set(`${i},${j}`, cb);
         optLabel.append(cb, ` ${rowData[j].nameInput.value || `Floor ${j}`}`);
         dropdown.appendChild(optLabel);
@@ -543,17 +825,17 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
           .map(cb => cb.dataset.levelIndex);
         if (indices.length === 0) {
           btn.textContent = "— ▾";
-          btn.title = "";
+          btn.dataset.tooltip = "";
         } else if (indices.length === 1) {
           btn.textContent = `${indices[0]} ▾`;
-          btn.title = indices[0];
+          btn.dataset.tooltip = `Also shows floor ${indices[0]}`;
         } else {
           btn.textContent = "Many ▾";
-          btn.title = indices.join(", ");
+          btn.dataset.tooltip = `Also shows floors ${indices.join(", ")}`;
         }
       };
       updateBtn();
-      dropdown.addEventListener("change", updateBtn);
+      dropdown.addEventListener("change", () => { updateBtn(); this._captureRowState(); });
 
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -584,6 +866,10 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       wrap.appendChild(btn);
       row.appendChild(wrap);
     }
+
+    // Snapshot the freshly-built rows so _levelState has an entry for every
+    // floor; subsequent edits update it via the delegated listeners above.
+    this._captureRowState();
   }
 
   /**
@@ -605,12 +891,17 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   static async #onImport(_event, _target) {
+    if (this._mode === "edit") { await this._applyLevelEdits(); return; }
     const folder = this.element.querySelector("input[name='folder']")?.value?.trim();
     const source = this.element.querySelector("input[name='source']")?.value?.trim() || "data";
     if (!folder) {
       ui.notifications.warn("Please select a folder first.");
       return;
     }
+
+    // Snapshot current inputs so the import reflects live edits regardless of
+    // render state (keeps _levelState authoritative at the import boundary).
+    this._captureRowState();
 
     // Validate elevation ranges first: each level's bottom must be below its top.
     // Only fully-numeric rows are checked — a blank field falls back to a computed
@@ -648,7 +939,8 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
         .filter(j => j !== null)
     }));
 
-    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, copyImages, doorTexture, doorSound, levelOverrides, initialLevelIndex: this._initialLevelIndex });
+    const initialLevelIndex = Math.max(0, this._floorPairs.findIndex(p => p.uid === this._initialLevelUid));
+    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, copyImages, doorTexture, doorSound, levelOverrides, initialLevelIndex });
     if (scene) this.close();
   }
 }

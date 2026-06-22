@@ -1,3 +1,49 @@
+# 0.0.14
+
+## [Added]
+- **Edit an existing scene's levels** — `DA.EditLevels()` and a new **"DA Edit Levels"** sidebar button. Open it on a scene you're viewing to rename levels, change their bottom/top elevations, reorder them (drag the **#**), and adjust Roof / Start / Visible, then **Apply Changes**. Edits are written in place by level id, so all walls, lights, and regions stay bound — no re-linking. *(v1 edits the existing levels; adding/removing levels is not yet supported. Reordering restacks elevations to the default ladder.)*
+
+# 0.0.13
+
+## [Fixed]
+- **Levels-tab edits are now captured continuously** into a per-floor state store, so a Name / elevation / Roof / Visible edit survives a full dialog re-render instead of silently reverting to defaults. (Prerequisite hardening for the upcoming edit-existing-scene work — see `docs/PLAN.md`.)
+- The **bottom floor's Roof toggle is disabled** — a floor with nothing below it can't be a roof; a roof dragged to the bottom clears automatically.
+- The oversized-media warning lists floors by filename (stable) instead of an index that could go stale after a reorder.
+- Enlarged hover previews no longer orphan on screen if the list rebuilds mid-hover.
+- The stairs tool's "current level" detection now validates the level still exists on the scene.
+
+# 0.0.12
+
+## [Added]
+- A **"DA Add Stairs / Elevator"** button is now injected into the Scenes sidebar next to the importer button, so the multi-level region tool is discoverable without typing `DA.AddRegion()`. Open (view) the imported scene, then click it and follow the dialog to place a stair/elevator region.
+
+# 0.0.11
+
+## [Added]
+- A floor whose **filename contains "roof"** is now auto-detected and **pre-marked as Roof** (with a notification listing which), so a Dungeon Alchemist roof layer is handled without opening the advanced columns. It's just a default — review or change it under "Show advanced columns". Roof placement remains automatic (no elevation numbers to set); just make sure the roof is the top row.
+
+# 0.0.10
+
+## [Fixed]
+- The **ⓘ info icon** now opens a readable help panel when clicked (the old hover tooltip didn't appear — Foundry suppresses plain `title` tooltips). The panel explains Roof / Start / Visible in plain language and makes clear that **most maps need none of them** and that roof placement is automatic.
+- All Levels-tab tooltips (column headers, drag handle, thumbnail filename/size, roof, star) now use Foundry's tooltip system, so they reliably show on hover.
+
+# 0.0.9
+
+## [Added]
+- **Drag-to-reorder floors**: drag a row by its **#** handle to change the stacking order. Bottom/Top elevations restack to the new order automatically, while each floor's **Name, Roof, Start, and Visible** settings travel with it — each floor now has a stable internal id, so edits survive reordering (and re-renders).
+
+# 0.0.8
+
+## [Added]
+- The Levels tab now defaults to a **Basic view** (`#`, preview, Name, Bottom, Top). A **"Show advanced columns"** toggle reveals Roof / Start / Visible, with an ⓘ icon explaining when each is useful. Advanced settings stay in place even while hidden, so nothing is lost.
+
+# 0.0.7
+
+## [Added]
+- The Levels tab now **pre-fills each level's Name with the original filename** (and shows it on the thumbnail tooltip alongside the file size), so you can tell which row is which floor.
+- Every Levels-tab **column header has an explanatory hover tooltip**, and a help line clarifies that the defaults already stack floors correctly — you only edit a row to fine-tune.
+
 # 0.0.6
 
 ## [Added]
