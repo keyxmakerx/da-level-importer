@@ -3,6 +3,7 @@ import { DARegionAdderDialog } from "./region-adder-dialog.js";
 import { startAddStairs, addStairsInteractive, startLinkRegions } from "./portal/portal-wizard.js";
 import { DAStairsManager } from "./portal/portal-manager.js";
 import { registerPortalOverlayHooks } from "./portal/portal-overlay.js";
+import { registerPlayerPortalHooks } from "./portal/portal-player-overlay.js";
 import { MODULE_ID, SETTING_IMPORTER_DEFAULTS } from "./constants.js";
 
 Hooks.once("init", () => {
@@ -30,6 +31,8 @@ Hooks.once("init", () => {
 
   // GM-only translucent link overlay for same-level portal pairs + portal markers.
   registerPortalOverlayHooks();
+  // Player-facing sight-gated "Stairs" labels (hover + click to use).
+  registerPlayerPortalHooks();
 });
 
 Hooks.once("ready", () => {
