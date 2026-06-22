@@ -42,17 +42,11 @@ function _buildThumbEl(src, className, { animate = false } = {}) {
 export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {{stem:string, index:number, json:string, media:string}[]} */
   _floorPairs = [];
-  /** Body-level dropdown elements that must be removed when the list is rebuilt or the dialog closes. */
-  _visDropdowns = [];
-  /** @type {Map<string, HTMLInputElement>} Keyed by "levelIndex,otherIndex" for fast lookup at import time. */
-  _visCheckboxes = new Map();
   /** Levels-tab video thumbnails currently mounted; paused/released on rebuild and close. */
   _thumbVideos = [];
-  /** The single active document-level "click outside to close" handler for the Visible Levels dropdowns. */
-  _visOutsideHandler = null;
   /** Stable id (uid) of the level shown on scene load; null until a folder is browsed. */
   _initialLevelUid = null;
-  /** @type {Map<string, {name:string,bottom:string,top:string,isRoof:boolean,visible:Set<string>}>} Per-floor editable state keyed by uid, so edits survive row rebuilds and reordering. */
+  /** @type {Map<string, {name:string,bottom:string,top:string,isRoof:boolean}>} Per-floor editable state keyed by uid, so edits survive row rebuilds and reordering. */
   _levelState = new Map();
   /** Source row index during an in-progress drag-to-reorder; null when not dragging. */
   _dragFromIndex = null;
@@ -264,7 +258,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       uniformInput.addEventListener("change", () => {
         const h = parseInt(uniformInput.value, 10);
         if (!Number.isFinite(h) || h < 1 || !this._floorPairs.length) return;
-        // Preserve names/roof/visible; restack all elevations to the new height.
+        // Preserve names/roof; restack all elevations to the new height.
         this._captureRowState();
         this._recomputeElevations();
         this._populateLevelsTab();
@@ -293,26 +287,6 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
     // Restore levels tab rows after any re-render.
     this._populateLevelsTab();
-  }
-
-  /**
-   * Remove all dropdown elements previously appended to document.body, drop the
-   * active outside-click handler, and clear checkbox refs. Called before
-   * rebuilding the list and on dialog close.
-   */
-  _teardownVisDropdowns() {
-    this._removeVisOutsideHandler();
-    for (const d of this._visDropdowns) d.remove();
-    this._visDropdowns = [];
-    this._visCheckboxes.clear();
-  }
-
-  /** Remove the active "click outside to close" handler for the Visible Levels dropdowns, if any. */
-  _removeVisOutsideHandler() {
-    if (this._visOutsideHandler) {
-      document.removeEventListener("click", this._visOutsideHandler);
-      this._visOutsideHandler = null;
-    }
   }
 
   /**
@@ -402,40 +376,34 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
-   * Snapshot the current Levels-tab edits (name, bottom, top, roof, and the set
-   * of visible levels — by uid) into this._levelState, keyed by each floor's
-   * stable uid, so values follow their floor rather than the row position. Run
-   * before any rebuild that must preserve edits (reorder, floor-height change).
+   * Snapshot the current Levels-tab edits (name, bottom, top, roof) into
+   * this._levelState, keyed by each floor's stable uid, so values follow their
+   * floor rather than the row position. Run before any rebuild that must
+   * preserve edits (reorder, floor-height change).
    */
   _captureRowState() {
     if (!this.element) return;
     for (let i = 0; i < this._floorPairs.length; i++) {
       const uid = this._floorPairs[i].uid;
-      const visible = new Set();
-      for (let j = 0; j < this._floorPairs.length; j++) {
-        if (j === i) continue;
-        if (this._visCheckboxes.get(`${i},${j}`)?.checked) visible.add(this._floorPairs[j].uid);
-      }
       this._levelState.set(uid, {
         name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value ?? "",
         bottom: this.element.querySelector(`input[name="levelBottom[${i}]"]`)?.value ?? "",
         top:    this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "",
-        isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false,
-        visible
+        isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false
       });
     }
   }
 
   /**
    * Restack every floor's bottom/top in this._levelState to the default range for
-   * its current position, using the uniform Floor Height field. Names/roof/visible
+   * its current position, using the uniform Floor Height field. Names/roof
    * are left untouched. Used after a reorder or a floor-height change.
    */
   _recomputeElevations() {
     const h = parseInt(this.element?.querySelector("input[name='uniformFloorHeight']")?.value ?? "", 10);
     const height = Number.isFinite(h) && h >= 1 ? h : FLOOR_HEIGHT;
     this._floorPairs.forEach((pair, i) => {
-      const st = this._levelState.get(pair.uid) ?? { name: pair.stem, isRoof: false, visible: new Set() };
+      const st = this._levelState.get(pair.uid) ?? { name: pair.stem, isRoof: false };
       st.bottom = String(i === 0 ? 0 : i * height + 1);
       st.top = String((i + 1) * height);
       if (i === 0) st.isRoof = false;   // a floor moved to the bottom can no longer be a roof
@@ -446,7 +414,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
   /**
    * Move a floor from index `from` to index `to` (drag-to-reorder): capture edits
    * (so they follow each floor), reorder, restack elevations to the new order,
-   * then rebuild. Names, roof, start, and visible selections are preserved; only
+   * then rebuild. Names, roof, and start are preserved; only
    * Bottom/Top recompute.
    *
    * @param {number} from
@@ -466,14 +434,8 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * Rebuild the Levels tab rows from this._floorPairs.
    * Called after folder selection and after each render.
    * Shows a placeholder when no folder has been selected yet.
-   *
-   * A second pass wires up each row's Visible Levels dropdown after all rows
-   * exist, so each dropdown can list every other level by name.
-   * Dropdowns are appended to document.body to avoid Foundry's window CSS transform
-   * containing position:fixed elements at the wrong viewport coordinates.
    */
   _populateLevelsTab() {
-    this._teardownVisDropdowns();
     this._teardownThumbVideos();
 
     const placeholder = this.element?.querySelector(".da-levels-placeholder");
@@ -482,9 +444,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
 
     // Continuous capture: any edit to a row input snapshots straight into
     // _levelState (wired once per list element), so edits survive a full
-    // ApplicationV2 re-render — which rebuilds rows from _levelState. The
-    // Visible-Levels checkboxes live in body-appended dropdowns (they don't
-    // bubble to the list), so they capture via their own change handler below.
+    // ApplicationV2 re-render — which rebuilds rows from _levelState.
     if (!list.dataset.daCaptureWired) {
       const capture = () => this._captureRowState();
       list.addEventListener("input", capture);
@@ -511,8 +471,7 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       { label: "Bottom",  title: "Lower elevation of this floor, in grid units" },
       { label: "Top",     title: "Upper elevation of this floor, in grid units" },
       { label: "Roof",    title: "Show this level only when the floor directly below is active (ceilings/roofs)", adv: true },
-      { label: "Start",   title: "Which floor is shown when the scene first loads", adv: true },
-      { label: "Visible", title: "Which other floors stay visible while this one is active", adv: true }
+      { label: "Start",   title: "Which floor is shown when the scene first loads", adv: true }
     ];
     for (const col of headerCols) {
       const span = document.createElement("span");
@@ -657,91 +616,6 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       });
     }
 
-    // Second pass — attach a Visible Levels dropdown to each row.
-    // Dropdowns are appended directly to document.body so that position:fixed
-    // coordinates are always viewport-relative, bypassing Foundry's window transform.
-    for (let i = 0; i < rowData.length; i++) {
-      const { row } = rowData[i];
-      const stI = this._levelState.get(this._floorPairs[i].uid);
-
-      const wrap = document.createElement("div");
-      wrap.className = "da-vis-wrap da-adv-col";
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "da-vis-btn";
-
-      const dropdown = document.createElement("div");
-      dropdown.className = "da-vis-dropdown";
-      dropdown.hidden = true;
-      document.body.appendChild(dropdown);
-      this._visDropdowns.push(dropdown);
-
-      for (let j = 0; j < rowData.length; j++) {
-        if (j === i) continue;
-        const optLabel = document.createElement("label");
-        optLabel.className = "da-vis-option";
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.name = `levelVisibility[${i}][${j}]`;
-        cb.dataset.levelIndex = String(j);
-        cb.checked = !!stI?.visible?.has(this._floorPairs[j].uid);
-        this._visCheckboxes.set(`${i},${j}`, cb);
-        optLabel.append(cb, ` ${rowData[j].nameInput.value || `Floor ${j}`}`);
-        dropdown.appendChild(optLabel);
-      }
-
-      // Render the button label as the comma-separated list of selected level
-      // indices (the field number, not its name) so multi-selection stays legible.
-      // Label shows the single selected level number, or a "Many" marker when
-      // multiple are selected (the full list stays available via the hover tooltip).
-      const updateBtn = () => {
-        const indices = [...dropdown.querySelectorAll("input:checked")]
-          .map(cb => cb.dataset.levelIndex);
-        if (indices.length === 0) {
-          btn.textContent = "— ▾";
-          btn.dataset.tooltip = "";
-        } else if (indices.length === 1) {
-          btn.textContent = `${indices[0]} ▾`;
-          btn.dataset.tooltip = `Also shows floor ${indices[0]}`;
-        } else {
-          btn.textContent = "Many ▾";
-          btn.dataset.tooltip = `Also shows floors ${indices.join(", ")}`;
-        }
-      };
-      updateBtn();
-      dropdown.addEventListener("change", () => { updateBtn(); this._captureRowState(); });
-
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const wasHidden = dropdown.hidden;
-        // Close all dropdowns (and drop any prior outside-click handler), then
-        // open this one if it was closed.
-        this._visDropdowns.forEach(d => { d.hidden = true; });
-        this._removeVisOutsideHandler();
-        if (wasHidden) {
-          const rect = btn.getBoundingClientRect();
-          dropdown.style.top = `${rect.bottom + 2}px`;
-          dropdown.style.left = `${rect.left}px`;
-          dropdown.hidden = false;
-          // Deferred outside-click handler so this very click doesn't close it
-          // immediately; tracked on the instance so it is never left dangling.
-          setTimeout(() => {
-            this._visOutsideHandler = (ev) => {
-              if (!dropdown.contains(ev.target) && ev.target !== btn) {
-                dropdown.hidden = true;
-                this._removeVisOutsideHandler();
-              }
-            };
-            document.addEventListener("click", this._visOutsideHandler);
-          }, 0);
-        }
-      });
-
-      wrap.appendChild(btn);
-      row.appendChild(wrap);
-    }
-
     // Snapshot the freshly-built rows so _levelState has an entry for every
     // floor; subsequent edits update it via the delegated listeners above.
     this._captureRowState();
@@ -755,7 +629,6 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
    * @override
    */
   async _onClose(options) {
-    this._teardownVisDropdowns();
     this._teardownThumbVideos();
     this._sizeAbort?.abort();
     document.querySelector(".da-door-tooltip")?.remove();
@@ -804,17 +677,21 @@ export class DAImporterDialog extends HandlebarsApplicationMixin(ApplicationV2) 
       name:   this.element.querySelector(`input[name="levelName[${i}]"]`)?.value?.trim() || `Floor ${i}`,
       bottom: parseInt(this.element.querySelector(`input[name="levelBottom[${i}]"]`)?.value ?? "", 10),
       top:    parseInt(this.element.querySelector(`input[name="levelTop[${i}]"]`)?.value ?? "", 10),
-      isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false,
-      visibleLevels: this._floorPairs
-        .map((_, j) => {
-          if (j === i) return null;
-          return this._visCheckboxes.get(`${i},${j}`)?.checked ? j : null;
-        })
-        .filter(j => j !== null)
+      isRoof: this.element.querySelector(`input[name="levelIsRoof[${i}]"]`)?.checked ?? false
     }));
 
     const initialLevelIndex = Math.max(0, this._floorPairs.findIndex(p => p.uid === this._initialLevelUid));
-    const scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, copyImages, doorTexture, doorSound, levelOverrides, initialLevelIndex });
+    // Safeguard: importFolder handles Scene.create errors internally, but guard the
+    // whole call so any unexpected failure (file I/O, mapping) surfaces a toast
+    // instead of an unhandled rejection that leaves the dialog in a dead state.
+    let scene;
+    try {
+      scene = await importFolder({ source, path: folder, backgroundColor, gridAlpha, copyImages, doorTexture, doorSound, levelOverrides, initialLevelIndex });
+    } catch (err) {
+      ui.notifications.error(`DA Importer: import failed (${err.message})`);
+      console.error(err);
+      return;
+    }
     if (scene) this.close();
   }
 }
